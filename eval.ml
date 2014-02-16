@@ -47,7 +47,7 @@ let rec extenddd a = function
   | (id, _) :: rest -> extenddd ((id, ref UndefinedV) :: a) rest;;
 let rec extendaaa eval a = function
     [] -> a
-  | (id, x) :: rest -> extenddd ((id, eval x) :: a) rest;;
+  | (id, x) :: rest -> extenaaa ((id, eval x) :: a) rest;;
 *)
 
 (* schemeの値の真偽を評価する bool値のfalseだけが偽と評価されその他は真と評価される *)
@@ -65,6 +65,14 @@ let rec appendenv env = function
     [] -> env
   |  a :: rest -> appendenv (a :: env) rest;;
 
+(* applyの環境を追加する *)
+let rec evalExplist env ids args : env =
+    match (ids, args) with
+      [], [] -> env
+    | id :: b, ex :: d ->
+        (id, ref ex) :: evalExplist env b d
+    | _, _ -> failwith "parameter unmatch"
+
 
 let rec evalExp env = function
   | IntExp x -> IntV x
@@ -80,11 +88,11 @@ let rec evalExp env = function
           BoolV false -> b | _ -> a)
 
   | AndExp ls ->
-      let rec loop result = function
-        | [] -> result
+      let rec loop = function
+        | [] -> BoolV true
         | a :: rest ->
-            if truep result then loop (evalExp env a) rest else result
-      in loop (BoolV true) ls
+            if truep (evalExp env a) then loop rest else BoolV false
+      in loop ls
   | OrExp ls ->
       let rec loop result = function
         | [] -> result
@@ -99,15 +107,28 @@ let rec evalExp env = function
   | ApplyExp (exp, args) ->
       let proc = evalExp env exp in
       let a = List.map (evalExp env) args in
-      eval_apply  proc a
+      eval_apply proc a
   | LetExp (binds, (defs, exp)) ->
       let a = extendlet env binds in
       let b = extendletrec a defs in
       evalExp b exp
+  | NamedLetExp (id, binds, body) ->
+      let (ids, args) = List.split binds in
+      let fn = LambdaExp (ids, body) in
+      let a = extendletrec env [id, fn] in
+      eval_apply (evalExp a (VarExp id)) (List.map (evalExp env) args)
   | LetrecExp (binds, (defs, exp)) ->
       let a = extendletrec env binds in
       let b = extendletrec a defs in
       evalExp b exp
+  | CondClauseExp x ->
+      (match x with
+	FUN (cond, ret, alt) ->
+	 let e = evalExp env cond in
+	 if truep e then eval_apply (evalExp env ret) [e] else evalExp env alt
+      | VAL (cond, alt) ->
+	 let e = evalExp env cond in
+	 if truep e then e else evalExp env alt)
   | SetExp (id, exp) ->
       let a = lookup id env in
       a := (evalExp env exp); UnitV
@@ -140,8 +161,10 @@ and evalQuote = function
       | a :: rest -> PairV (ref (evalQuote a), ref (loop rest)) in
       loop x
 (*  | _ -> failwith "evalQuote" *)
+and extendlet_ env =
+  List.map (fun (id, x) -> (id, ref (evalExp env x)))
 
-and extendlet env  = function (* fold_right *)
+and extendlet env = function (* fold_right *)
     [] -> env
   | (id, x) :: rest ->
        (id, ref (evalExp env x)) :: extendlet env  rest
@@ -160,9 +183,11 @@ and extendletrec env binds : env =  (* fold_left *)
     a := evalExp b ex) binds;
   b
 
+(*
 and evalExplist env ids args : env =
     match (ids, args) with
       [], [] -> env
     | id :: b, ex :: d ->
         (id, ref ( ex)) :: evalExplist env b d
     | _, _ -> failwith "parameter unmatch"
+*)

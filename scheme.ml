@@ -37,7 +37,7 @@ let rec printval = function
   | PairV (a, b) ->  "(" ^ printval !a ^ pppair !b ^ ")"
   | EmptyListV ->  "()"
   | UnboundV ->  "*unbound*"
-  | UnitV -> ""
+  | UnitV -> "#void"
 
 and pppair = function(* PairVの第2要素 *)
     EmptyListV -> ""
@@ -445,13 +445,13 @@ let primis =
      | [o; l] -> assoc equalp o l
      | _ -> failwith "Arity mismatch: assoc");
   ("map", function
-       [proc;l] -> mapimpl proc l
+       [proc; l] -> mapimpl proc l
      | _ -> failwith "Arity mismatch: map");
   ("foldl", function
-       [proc;init;l] -> foldlimpl proc init l
+       [proc; init; l] -> foldlimpl proc init l
      | _ -> failwith "Arity mismatch: foldl");
   ("foldr", function
-       [proc;init;l] -> foldrimpl proc init l
+       [proc; init; l] -> foldrimpl proc init l
      | _ -> failwith "Arity mismatch: foldr");
 
   ("write", function 
@@ -470,9 +470,13 @@ let primis =
   ("symbol?", function
        [x] -> BoolV (symbolp x)
      | _ -> failwith "Arity mismatch: symbol?");
-  ("apply",  (fun (x :: y) -> apply x y));
-  ("apply2", (fun (x :: y) -> apply2 x y));
-
+  ("apply", function
+       (x :: y) -> apply x y
+     | _ -> failwith "Arity mismatch: apply");
+  ("apply2", function 
+       (x :: y) -> apply2 x y
+     | _ -> failwith "Arity mismatch: apply2");
+   
   ] in
   List.map (fun (id, f) -> (id, ref (PrimV f))) a
 
@@ -488,9 +492,9 @@ let evallex sexps =
     evalExp envv exp;;
 
 let eval s =
-  evallex (Sparser.toplevel Lexer.main (Lexing.from_string s))
+  printval (evallex (Sparser.toplevel Lexer.main (Lexing.from_string s)))
 
-  
+
 let openandlex name =
   let f = open_in name in
   try
@@ -498,16 +502,19 @@ let openandlex name =
     close_in f; s
   with Failure msg -> close_in f; raise (Failure msg)
 
-let interprete name =
-  print_string (printval (evallex (openandlex name)))
+let interpret name =
+   printval (evallex (openandlex name))
 
-let parseExp s =
+let parse s =
   Parser.parseExp (Sparser.sexpdata Lexer.main (Lexing.from_string s))
 
+
+(*
 let _ =
   let fn = ref [] in
   Arg.parse [] (fun s -> fn := s :: !fn) "";
-  interprete (List.hd !fn)
+  print_endline (interpret (List.hd !fn));
+ *)
 
 (*
 ocaml sparser.cmo  parser.cmo lexer.cmo eval.cmo scheme.cmo
