@@ -39,11 +39,6 @@ and condclause =
 
 exception ParseError of string
 
-(*
-let aaa = function
-  | Id id  -> id 
-  | _ -> raise (ParseError "parseIdlist");;
-*)
 
 let rec parseIdlist : sexp list -> id list = function
   | [] -> []
@@ -100,26 +95,26 @@ and parseForm : sexp list -> exp = function
   | Id "let" :: rest ->
       (match rest with
       | Id var :: List binds :: body ->
-          let (ids, args) = unzipBindings binds and b = parseBody body in
-          let fn = LambdaExp (ids, b) in
+          let (ids, args) = unzipBindings binds in
+          let fn = LambdaExp (ids, parseBody body) in
 	  let l = LetrecExp ([var, fn], ([], VarExp var)) in
           ApplyExp (l, args)
 (*
       | Id var :: List binds :: body ->
           let (ids, args) = unzipBindings binds and b = parseBody body in
-          let lm = LambdaExp (ids, b) in
-          LetrecExp ([var, lm], ([], ApplyExp (VarExp var, args)))
+          let fn = LambdaExp (ids, b) in
+          LetrecExp ([var, fn], ([], ApplyExp (VarExp var, args)))
 *)
       | List binds :: body ->
-          let (ids, args) = unzipBindings binds and b = parseBody body in
-          let lm = LambdaExp (ids, b) in
-          ApplyExp (lm, args)
+          let (ids, args) = unzipBindings binds in
+	  let fn = LambdaExp (ids, parseBody body) in
+          ApplyExp (fn, args)
       | _ -> raise (ParseError "let"))
   | Id "letrec" :: rest ->
       (match rest with
         List binds :: b ->
-          let a = parseBinding binds and c = parseBody b in
-          LetrecExp (a, c)
+          let a = parseBinding binds in
+          LetrecExp (a, parseBody b)
       | _ -> raise (ParseError ""))
   | Id "set!" :: rest ->
       (match rest with 
@@ -132,13 +127,13 @@ and parseForm : sexp list -> exp = function
        ApplyExp (opp, args)
   | _ -> raise (ParseError "unexpected )")
 
-and parseExplist : sexp list -> exp list = fun l ->
+and parseExplist (l : sexp list) =
   List.map parseExp l
 
-and parseBinding : sexp list -> (id * exp) list = function
-    [] -> []
-  | List [Id id; ex] :: rest -> (id, parseExp ex) :: parseBinding rest
-  |  _ -> raise (ParseError "bindings")
+and parseBinding (l: sexp list) : (id * exp) list =
+  List.map (function
+	       | List [Id id; ex] -> (id, parseExp ex)
+	       | _ -> raise (ParseError "bindings")) l
 
 and unzipBindings : sexp list -> (id list * exp list) = function
     [] -> [],[]
@@ -151,8 +146,8 @@ and parseClauses' = function
     [] -> UnitExp  (* else節なし  *)
   | List e :: rest ->
       (match e, rest with
-        Id "else" :: body, [] -> body_to_exp (List.map parseExp body)
-      | Id "else" :: _,    _  -> raise (ParseError "else clause is not last")
+        Id "else" :: body,  [] -> body_to_exp (List.map parseExp body)
+      | Id "else" :: _,     _  -> raise (ParseError "else clause is not last")
       | [cond; Id "=>"; fn],_  ->
 	  CondClauseExp (FUN (parseExp cond, parseExp fn, parseClauses' rest))
       | cond :: [],         _  ->
@@ -175,7 +170,8 @@ and parseClauses = function
           xy :: parseClauses rest
       | cond :: body,       _  -> 
 	  let xy = (parseExp cond, List.map parseExp body) in
-	  xy :: parseClauses rest)
+	  xy :: parseClauses rest
+      | [],                 _  -> failwith "not concidered")
   | _ -> raise (ParseError "cond clause")
 
 and clausestoif clauses = 
@@ -188,7 +184,7 @@ and body_to_exp = function
   | x -> BeginExp x
 
 (* 定義は[本体]の先頭で有効 *)
-and parseDef : sexp list -> define  = function
+and parseDef : sexp list -> define = function
   | List (Id id :: rest) :: l -> 
       let ids = parseIdlist rest and body = parseBody l in
       id, LambdaExp (ids, body)
@@ -226,9 +222,8 @@ let parseFunc : sexp list -> def  = function
 
 let rec parseProg : sexp list -> prog = function
     [] -> raise (ParseError " parseProg ")
-  | List (Id "define" :: x) :: d ->
-       let def = parseFunc x in
-       let (fl, vl, exp) = parseProg d in
+  | List (Id "define" :: x) :: rest ->
+       let def = parseFunc x and (fl, vl, exp) = parseProg rest in
        (match def with
          Func f -> (f :: fl, vl, exp)
        | Var v -> (fl, v :: vl, exp))

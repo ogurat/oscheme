@@ -41,14 +41,6 @@ let rec extend f idlist explist =
   | _, _ -> failwith "parameter unmatch"
 *)
 
-(*
-let rec extenddd a = function
-    [] -> a
-  | (id, _) :: rest -> extenddd ((id, ref UndefinedV) :: a) rest;;
-let rec extendaaa eval a = function
-    [] -> a
-  | (id, x) :: rest -> extenaaa ((id, eval x) :: a) rest;;
-*)
 
 (* schemeの値の真偽を評価する bool値のfalseだけが偽と評価されその他は真と評価される *)
 let truep = function
@@ -65,12 +57,12 @@ let rec appendenv env = function
     [] -> env
   |  a :: rest -> appendenv (a :: env) rest;;
 
-(* applyの環境を追加する *)
-let rec evalExplist env ids args : env =
+(* applyのargsをrefに変換して環境に追加する *)
+let rec extendExplist env ids args : env =
     match (ids, args) with
       [], [] -> env
     | id :: b, ex :: d ->
-        (id, ref ex) :: evalExplist env b d
+        (id, ref ex) :: extendExplist env b d
     | _, _ -> failwith "parameter unmatch"
 
 
@@ -105,8 +97,8 @@ let rec evalExp env = function
       ProcV (ids, body, env)
 
   | ApplyExp (exp, args) ->
-      let proc = evalExp env exp in
-      let a = List.map (evalExp env) args in
+      let proc = evalExp env exp
+      and a = List.map (evalExp env) args in
       eval_apply proc a
   | LetExp (binds, (defs, exp)) ->
       let a = extendlet env binds in
@@ -140,11 +132,10 @@ let rec evalExp env = function
 and eval_apply proc args =
   (match proc with
     ProcV (ids, (defs, exp), en) -> (* procには定義リストもある  *)
-      let newenv = evalExplist en ids args in
+      let newenv = extendExplist en ids args in
       let newnewenv = extendletrec newenv defs in
       evalExp newnewenv exp
   | PrimV closure ->
-      (* let s = List.map (evalExp env) args in *)
       closure args
   | UnboundV -> failwith "unbound proc!"
   | _ -> failwith "not proc")
@@ -161,10 +152,9 @@ and evalQuote = function
       | a :: rest -> PairV (ref (evalQuote a), ref (loop rest)) in
       loop x
 (*  | _ -> failwith "evalQuote" *)
-and extendlet_ env =
-  List.map (fun (id, x) -> (id, ref (evalExp env x)))
 
-and extendlet env = function (* fold_right *)
+
+and extendlet env : (id * exp) list -> env = function (* fold_right *)
     [] -> env
   | (id, x) :: rest ->
        (id, ref (evalExp env x)) :: extendlet env  rest
@@ -173,21 +163,30 @@ and extendlet' env a = function (* fold_left *)
     [] -> a
   | (id, x) :: rest -> extendlet' env ((id, ref (evalExp env x)) :: a) rest
 *)
-and extendletrec env binds : env =  (* fold_left *)
+
+
+and extendletrec env binds : env =
+  let rec ext = function
+      [] -> env
+    | (id, _) :: rest -> (id, ref UnboundV) :: ext rest in
+  let newenv = ext binds in
+  let rec loop e = function
+      [] -> ()
+    | (_, exp) :: rest  ->
+	let (_, v) :: r = e in
+        v := evalExp newenv exp; loop r rest
+  in
+  loop newenv binds;
+  newenv
+
+
+and extendletrec' env binds : env =  (* fold_left *)
   let rec ext a = function
       [] -> a
     | (id, _) :: rest -> ext ((id, ref UnboundV) :: a) rest in
-  let b = ext env binds in
+  let newenv = ext env binds in
   List.iter (fun (id, ex) ->
-    let a = lookup id b in
-    a := evalExp b ex) binds;
-  b
-
-(*
-and evalExplist env ids args : env =
-    match (ids, args) with
-      [], [] -> env
-    | id :: b, ex :: d ->
-        (id, ref ( ex)) :: evalExplist env b d
-    | _, _ -> failwith "parameter unmatch"
-*)
+	     let a = lookup id newenv in
+	     a := evalExp newenv ex)
+	    binds;
+  newenv

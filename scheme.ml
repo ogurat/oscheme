@@ -1,6 +1,7 @@
 (* oschme scheme.ml *)
 
 open Eval
+open Parser
 
 
 (* primitives *)
@@ -299,28 +300,30 @@ let symbolp = function
 
 
 (* apply primitive *)
-    (* (apply + 1 2 '(3))  : 6 *)
+    (* (apply + 1 2 '(3 4))  : 10 *)
 
 (* propper listであれば valtype listにする *)
-let rec qqq = function
+let rec qqq : valtype -> valtype list = function
   | EmptyListV -> []
   | PairV (a, b) -> !a :: qqq !b
-  | _ -> failwith "listでない"
+  | _ -> failwith "apply: not list"
+(* 最後の引数が,listであれば、最後の一つ前までをリストとして、最後の引数をappendする *)
 let rec ppp : valtype list -> valtype list = function
-    [a] -> if  (listp a) then qqq a else failwith "listでない" 
+    [] -> failwith "apply: no args"
+  | [a] -> qqq a
   | a :: rest -> a :: (ppp rest)
 
 let apply (proc : valtype) (args : valtype list) =
-  let rec evalExplist env a ids args  : env = (* 評価後順序が反転する *)
+  let rec evalExplist env ids args : env =
     match (ids, args) with
-      [], [] -> a
+      [], [] -> env
     | id :: b, ex :: d ->
-        evalExplist env ((id, ref ex) :: a) b d
+        (id, ref ex) :: evalExplist env b d
     | _, _ -> failwith "parameter unmatch" in
     let newargs = ppp args in
   (match proc with
     ProcV (ids, (defs, ex), en) -> (* procには定義リストもある  *)
-      let newenv = evalExplist [] en ids newargs in
+      let newenv = extendExplist en ids newargs in
       let newnewenv = extendletrec newenv defs in
       evalExp newnewenv ex 
   | PrimV closure ->
@@ -328,8 +331,7 @@ let apply (proc : valtype) (args : valtype list) =
   | _ -> failwith "apply:not proc");;
 
 let apply2 (proc : valtype) (args : valtype list) =
-   let newargs = ppp args in
-   eval_apply proc newargs
+   eval_apply proc (ppp args)
 
 
 
@@ -470,10 +472,10 @@ let primis =
   ("symbol?", function
        [x] -> BoolV (symbolp x)
      | _ -> failwith "Arity mismatch: symbol?");
-  ("apply", function
+  ("apply_", function
        (x :: y) -> apply x y
      | _ -> failwith "Arity mismatch: apply");
-  ("apply2", function 
+  ("apply", function
        (x :: y) -> apply2 x y
      | _ -> failwith "Arity mismatch: apply2");
    
@@ -482,20 +484,24 @@ let primis =
 
 
 
+let parse s =
+  parseExp (Sparser.sexpdata Lexer.main (Lexing.from_string s))
+
+
 (* 環境を先に評価すると定義の順序が問題となる *)
 (* 環境をlookupしたときに評価すべきか *)
 let evallex sexps =
   (* let sexps = Sparser.toplevel Lexer.main lexbuf in *)
   let (defs, exp) = Parser.parseBody sexps in
   let envv = extendletrec primis defs in
-    (* let envv = List.map (fun (id, exp) -> (id, ref (evalExp [] exp))) deflist in *)
     evalExp envv exp;;
 
 let eval s =
-  printval (evallex (Sparser.toplevel Lexer.main (Lexing.from_string s)))
+  let x = Sparser.toplevel Lexer.main (Lexing.from_string s) in
+  printval (evallex x)
 
 
-let openandlex name =
+let lex_from name =
   let f = open_in name in
   try
     let s = Sparser.toplevel Lexer.main (Lexing.from_channel f) in
@@ -503,10 +509,13 @@ let openandlex name =
   with Failure msg -> close_in f; raise (Failure msg)
 
 let interpret name =
-   printval (evallex (openandlex name))
+   printval (evallex (lex_from name))
 
-let parse s =
-  Parser.parseExp (Sparser.sexpdata Lexer.main (Lexing.from_string s))
+
+let binda = [("a", IntExp 1); ("b", IntExp 4); ("c", IntExp 5)];;
+
+let exttest =
+ (extendletrec primis binda, extendletrec' primis binda)
 
 
 (*
