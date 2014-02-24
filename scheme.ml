@@ -1,5 +1,4 @@
 (* oschme scheme.ml *)
-
 open Eval
 open Parser
 
@@ -47,20 +46,6 @@ and pppair = function(* PairVの第2要素 *)
 
 
 
-(* evalQuoteと同じ
-let rec stoobject = function
-    Syntax.Id s -> SymbolV s
-  | Syntax.Bool x -> BoolV x
-  | Syntax.Char x -> CharV x
-  | Syntax.String x -> StringV x
-  | Syntax.Int x -> IntV x
-  | Syntax.List x -> 
-      let rec loop = function
-        [] -> EmptyListV
-      | a :: rest -> PairV (ref (stoobject a), ref (loop rest)) in
-      loop x
-*) 
-
 let stolistt s = []
 
 let read () =
@@ -75,28 +60,28 @@ let eqp x y =
   match (x, y) with
   | (BoolV true, BoolV true) 
   | (BoolV false, BoolV false) ->  true
-  | (SymbolV s, SymbolV s2) when s = s2 ->  true
+  | (SymbolV s, SymbolV s2) -> s = s2
   | (EmptyListV, EmptyListV) ->  true
-  | StringV a, StringV b when a == b ->  true
-  | VectorV a, VectorV b when a == b ->  true
+  | StringV a, StringV b -> a == b
+  | VectorV a, VectorV b -> a == b
   | _ ->  false
 
 let eqvp x y =
   match (x, y) with
   | a,b when (eqp a b) -> true
-  | (IntV x, IntV y) when x = y -> true
-  | (CharV c, CharV d) ->  c = d
+  | (IntV x, IntV y) -> x = y
+  | (CharV c, CharV d) -> c = d
   | _ ->  false
 
 let rec equalp x y =
   match (x, y) with
+  | a,b when (eqvp a b) ->  true
   | PairV (a, b), PairV (c, d) -> (equalp !a !c) && (equalp !b !d)
   | VectorV a, VectorV b -> false
-  | a,b when (eqvp a b) ->  true
   | _ ->  false
 
 
-
+(*
 let add (ls :valtype list) =
   let rec apply = function
     | [IntV i] -> i
@@ -110,7 +95,7 @@ let multi (ls :valtype list) =
     | IntV a :: tl -> a * apply tl 
     | _ -> failwith "Arity mismatch: +"
   in IntV (apply ls)
-
+ *)
 let minus (ls :valtype list) =
   let rec apply = function
     | [IntV i; IntV j] -> i - j
@@ -257,7 +242,7 @@ let assoc pred o l =
     | _ -> failwith "Arity mismatch: assoc"
   in loop l
 
-
+(*
 let mapimpl proc l =
   let rec map = function
     | EmptyListV -> EmptyListV
@@ -265,7 +250,7 @@ let mapimpl proc l =
         PairV (ref (eval_apply proc [!x]), ref (map !rest))
     | _ -> failwith "not pair: map"
   in map l
-
+ *)
 let foldlimpl proc init l =
   let rec fold accum = function
     | EmptyListV -> accum
@@ -313,6 +298,7 @@ let rec ppp : valtype list -> valtype list = function
   | [a] -> qqq a
   | a :: rest -> a :: (ppp rest)
 
+(*
 let apply (proc : valtype) (args : valtype list) =
   let rec evalExplist env ids args : env =
     match (ids, args) with
@@ -332,24 +318,32 @@ let apply (proc : valtype) (args : valtype list) =
 
 let apply2 (proc : valtype) (args : valtype list) =
    eval_apply proc (ppp args)
-
-
+*)
 
 let primis = 
-  let a = [
-  ("+", add);
-  ("*", multi);
+   List.map (fun (id, f) -> (id, ref (PrimV f))) [
+  ("+", let rec apply = function
+    | [IntV i] -> i
+    | IntV a :: tl -> a + apply tl 
+    | _ -> failwith "Arity mismatch: +"
+  in fun args -> IntV (apply args));
+  ("*", let rec apply = function
+    | [IntV i] -> i
+    | IntV a :: tl -> a * apply tl 
+    | _ -> failwith "Arity mismatch: +"
+  in fun args -> IntV (apply args));
   ("-", minus);
   ("boolean?", function
        [x] -> BoolV (booleanp x)
      | _ -> failwith "Arity mismatch: boolean?");
-  ("not",  function
-       [x] -> BoolV (not x)
+  ("not", function
+       [BoolV false] -> BoolV true
+     | [_] -> BoolV false
      | _ -> failwith "Arity mismatch: not");
   ("eq?", function
        [x;y] -> BoolV (eqp x y)
      | _ -> failwith "Arity mismatch: eq?");
-  ("eqv?",  function
+  ("eqv?", function
        [x;y] -> BoolV (eqvp x y)
      | _ -> failwith "Arity mismatch: eqv?");
   ("equal?", function
@@ -358,8 +352,12 @@ let primis =
   ("=", function
        [x;y] -> BoolV (eq x y)
      | _ -> failwith "Arity mismatch: equal?");
-  ("<", lt);
-  (">", gt);
+  ("<",  function
+    | [IntV i; IntV j] -> BoolV (i < j)
+    | _ -> failwith "Arity mismatch: =");
+  (">",  function
+    | [IntV i; IntV j] -> BoolV (i > j)
+    | _ -> failwith "Arity mismatch: =");
   ("number?", function
        [x] -> BoolV (numberp x)
      | _ -> failwith "Arity mismatch: number?");
@@ -390,7 +388,7 @@ let primis =
   ("cdar", function
        [x] -> cdr (car x)
      | _ -> failwith "Arity mismatch: cdar");
-  ("cddr",  function
+  ("cddr", function
      | [x] -> cdr (cdr x)
      | _ -> failwith "Arity mismatch: cddr");
   ("caadr", function
@@ -447,7 +445,13 @@ let primis =
      | [o; l] -> assoc equalp o l
      | _ -> failwith "Arity mismatch: assoc");
   ("map", function
-       [proc; l] -> mapimpl proc l
+       [proc; l] ->
+       let rec map = function
+	 | EmptyListV -> EmptyListV
+	 | PairV(x, rest) ->
+            PairV (ref (eval_apply proc [!x]), ref (map !rest))
+	 | _ -> failwith "not pair: map"
+       in map l
      | _ -> failwith "Arity mismatch: map");
   ("foldl", function
        [proc; init; l] -> foldlimpl proc init l
@@ -479,9 +483,11 @@ let primis =
        (x :: y) -> apply2 x y
      | _ -> failwith "Arity mismatch: apply2");
    
-  ] in
+  ]
+(*
   List.map (fun (id, f) -> (id, ref (PrimV f))) a
 
+ *)
 
 
 let parse s =
@@ -512,18 +518,22 @@ let interpret name =
    printval (evallex (lex_from name))
 
 
+(*
 let binda = [("a", IntExp 1); ("b", IntExp 4); ("c", IntExp 5)];;
 
 let exttest =
  (extendletrec primis binda, extendletrec' primis binda)
+*)
 
 
-(*
+
 let _ =
   let fn = ref [] in
   Arg.parse [] (fun s -> fn := s :: !fn) "";
-  print_endline (interpret (List.hd !fn));
- *)
+   if List.length !fn > 0 then
+  print_endline (interpret (List.hd !fn))
+else ()
+
 
 (*
 ocaml sparser.cmo  parser.cmo lexer.cmo eval.cmo scheme.cmo

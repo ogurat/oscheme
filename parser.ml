@@ -62,9 +62,11 @@ and parseForm : sexp list -> exp = function
       | _ -> raise (ParseError "quote"))
   | Id "if" :: rest ->
       (match rest with
-        [pred; a; b]->
-           IfExp (parseExp pred, parseExp a, parseExp b)
-      | _ -> raise (ParseError "if") )
+        [pred; conseq; alt] ->
+           IfExp (parseExp pred, parseExp conseq, parseExp alt)
+       |[pred; conseq] ->
+	 IfExp (parseExp pred, parseExp conseq, UnitExp)
+       | _ -> raise (ParseError "if") )
   | Id "and" :: rest ->
       let rec make = function
           [] -> BoolExp true

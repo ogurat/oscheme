@@ -11,7 +11,7 @@ valtype =
   | CharV of char
   | StringV of string
   | SymbolV of id
-  | ProcV of id list * body * env
+  | ProcV of id list * body * env  (* body: (id * exp) list * exp  *)
   | PrimV of (valtype list -> valtype) 
   | PairV of valtype ref * valtype ref
   | EmptyListV
@@ -27,19 +27,6 @@ let rec lookup a : (env -> valtype ref) = function
     [] -> failwith ("runtime: var " ^ a ^ " not exist")
   | (x, v) :: rest -> if a = x then v else lookup a rest;;
 
-(*
-let rec lookupfun a  = function
-    [] -> failwith ("runtime: fun " ^ a ^ " not fun exist")
-  | (x, y, z) :: rest -> if x = a then (y, z) else lookupfun a rest;;
-*)
-(*
-let rec extend f idlist explist =
-  match (idlist, explist) with
-    [], [] -> []
-  | a :: b, c :: d ->
-     (a, f c) :: (extend f b d)
-  | _, _ -> failwith "parameter unmatch"
-*)
 
 
 (* schemeの値の真偽を評価する bool値のfalseだけが偽と評価されその他は真と評価される *)
@@ -66,6 +53,19 @@ let rec extendExplist env ids args : env =
     | _, _ -> failwith "parameter unmatch"
 
 
+let rec evalQuote = function
+    Syntax.Id s -> SymbolV s
+  | Syntax.Bool x -> BoolV x
+  | Syntax.Char x -> CharV x
+  | Syntax.String x -> StringV x
+  | Syntax.Int x -> IntV x
+  | Syntax.List x ->
+      let rec loop = function
+        [] -> EmptyListV
+      | a :: rest -> PairV (ref (evalQuote a), ref (loop rest)) in
+      loop x
+
+
 let rec evalExp env = function
   | IntExp x -> IntV x
   | BoolExp x -> BoolV x
@@ -75,21 +75,25 @@ let rec evalExp env = function
   | QuoteExp x -> evalQuote x
   | UnitExp -> UnitV
   | IfExp (c, a, b) ->
-      let v = evalExp env c in
-      evalExp env (match v with
+      evalExp env (match evalExp env c with
           BoolV false -> b | _ -> a)
 
   | AndExp ls ->
       let rec loop = function
         | [] -> BoolV true
+	| [a] -> evalExp env a
         | a :: rest ->
-            if truep (evalExp env a) then loop rest else BoolV false
+            (match evalExp env a with
+	       BoolV false -> BoolV false
+	     | _ -> loop rest)
       in loop ls
   | OrExp ls ->
       let rec loop result = function
         | [] -> result
         | a :: rest ->
-            if truep result then result else loop (evalExp env a) rest
+            (match result with
+	       BoolV false -> loop (evalExp env a) rest
+	     | e ->  e)
       in loop (BoolV false) ls
 
   | LambdaExp (ids, body) ->
@@ -116,22 +120,31 @@ let rec evalExp env = function
   | CondClauseExp x ->
       (match x with
 	FUN (cond, ret, alt) ->
-	 let e = evalExp env cond in
-	 if truep e then eval_apply (evalExp env ret) [e] else evalExp env alt
+	 (match evalExp env cond with
+	    BoolV false -> evalExp env alt
+	  | e -> eval_apply (evalExp env ret) [e])
       | VAL (cond, alt) ->
-	 let e = evalExp env cond in
-	 if truep e then e else evalExp env alt)
+	 (match evalExp env cond with
+	  | BoolV false -> evalExp env alt | e -> e)
+      )
   | SetExp (id, exp) ->
       let a = lookup id env in
       a := (evalExp env exp); UnitV
-  | BeginExp explist ->
+  | BeginExp exps ->
+     let rec loop = function
+	 [] -> UnitV
+       | [x] -> evalExp env x
+       | x :: rest -> evalExp env x; loop rest in
+     loop exps
+(*
       let result = ref UnitV in
       List.iter (fun x -> result := evalExp env x) explist;
       !result
+*)
 
 and eval_apply proc args =
   (match proc with
-    ProcV (ids, (defs, exp), en) -> (* procには定義リストもある  *)
+    ProcV (ids, (defs, exp), en) ->
       let newenv = extendExplist en ids args in
       let newnewenv = extendletrec newenv defs in
       evalExp newnewenv exp
@@ -139,19 +152,6 @@ and eval_apply proc args =
       closure args
   | UnboundV -> failwith "unbound proc!"
   | _ -> failwith "not proc")
-
-and evalQuote = function
-    Syntax.Id s -> SymbolV s
-  | Syntax.Bool x -> BoolV x
-  | Syntax.Char x -> CharV x
-  | Syntax.String x -> StringV x
-  | Syntax.Int x -> IntV x
-  | Syntax.List x -> 
-      let rec loop = function
-        [] -> EmptyListV
-      | a :: rest -> PairV (ref (evalQuote a), ref (loop rest)) in
-      loop x
-(*  | _ -> failwith "evalQuote" *)
 
 
 and extendlet env : (id * exp) list -> env = function (* fold_right *)
@@ -163,7 +163,6 @@ and extendlet' env a = function (* fold_left *)
     [] -> a
   | (id, x) :: rest -> extendlet' env ((id, ref (evalExp env x)) :: a) rest
 *)
-
 
 and extendletrec env binds : env =
   let rec ext = function
@@ -178,7 +177,6 @@ and extendletrec env binds : env =
   in
   loop newenv binds;
   newenv
-
 
 and extendletrec' env binds : env =  (* fold_left *)
   let rec ext a = function
