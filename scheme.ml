@@ -1,10 +1,13 @@
 (* oschme scheme.ml *)
-open Eval
+
 open Parser
+open Value
+
 
 
 (* primitives *)
 
+(*
 let print_env env =
   List.iter 
     (fun (id, v) ->
@@ -15,13 +18,15 @@ let print_env env =
       print_string ";"
     )
     env
+*)
+
 
 let pplist =
   let rec pprest = function
       [] -> ""
     | a :: b ->  " " ^ a ^ pprest b in
   function
-      [] -> ""
+      [] -> "()"
     | x :: rest -> "(" ^  x ^ pprest rest ^ ")"
 
 
@@ -31,7 +36,7 @@ let rec printval = function
 (*  | CharV x -> string_of_char x *)
   | SymbolV x ->  (x)
   | StringV x ->  x (* "\"" ^ x ^ "\"" *)
-  | ProcV (args, (deflist, _), env) ->
+  | ProcV (args, deflist, _, env) ->
        "#proc:" ^ (pplist args)
   | PrimV _ ->  "primitive"
   | PairV (a, b) ->  "(" ^ printval !a ^ pppair !b ^ ")"
@@ -63,7 +68,7 @@ let eqp x y =
   | (SymbolV s, SymbolV s2) -> s = s2
   | (EmptyListV, EmptyListV) ->  true
   | StringV a, StringV b -> a == b
-  | VectorV a, VectorV b -> a == b
+(*  | VectorV a, VectorV b -> a == b *)
   | _ ->  false
 
 let eqvp x y =
@@ -77,7 +82,7 @@ let rec equalp x y =
   match (x, y) with
   | a,b when (eqvp a b) ->  true
   | PairV (a, b), PairV (c, d) -> (equalp !a !c) && (equalp !b !d)
-  | VectorV a, VectorV b -> false
+(*  | VectorV a, VectorV b -> false *)
   | _ ->  false
 
 
@@ -96,7 +101,7 @@ let multi (ls :valtype list) =
     | _ -> failwith "Arity mismatch: +"
   in IntV (apply ls)
  *)
-let minus (ls :valtype list) =
+let minus ls =
   let rec apply = function
     | [IntV i; IntV j] -> i - j
     | _ -> failwith "Arity mismatch: -"
@@ -114,19 +119,19 @@ let eq x y =
     | IntV i, IntV j -> i = j 
     | _ -> false
 
-
-let lt (ls : valtype list) =
+(*
+let lt ls =
   let rec apply = function
     | [IntV i; IntV j] -> i < j 
     | _ -> failwith "Arity mismatch: ="
   in BoolV (apply ls)
 
-let gt (ls : valtype list) =
+let gt ls =
   let rec apply = function
     | [IntV i; IntV j] -> i > j 
     | _ -> failwith "Arity mismatch: ="
   in BoolV (apply ls)
-
+ *)
 let numberp = function
     IntV _ -> true
   | _ -> false
@@ -242,31 +247,31 @@ let assoc pred o l =
     | _ -> failwith "Arity mismatch: assoc"
   in loop l
 
-(*
-let mapimpl proc l =
-  let rec map = function
+
+let map proc l =
+  let rec impl = function
     | EmptyListV -> EmptyListV
     | PairV(x, rest) ->
-        PairV (ref (eval_apply proc [!x]), ref (map !rest))
+        PairV (ref (Eval.eval_apply proc [!x]), ref (impl !rest))
     | _ -> failwith "not pair: map"
-  in map l
- *)
-let foldlimpl proc init l =
-  let rec fold accum = function
+  in impl l
+
+let foldl proc init l =
+  let rec impl accum = function
     | EmptyListV -> accum
     | PairV(x, rest) ->
-        fold (eval_apply proc [!x;accum]) !rest
+        impl (Eval.eval_apply proc [!x;accum]) !rest
     | _ -> failwith "not pair: foldl"
-  in fold init l
+  in impl init l
 
-let foldrimpl proc init l =
-  let rec fold = function
+let foldr proc init l =
+  let rec impl = function
     | EmptyListV -> init
     | PairV(x, rest) ->
-        let a = fold !rest in
-        eval_apply proc [!x;a]
+        let a = impl !rest in
+        Eval.eval_apply proc [!x;a]
     | _ -> failwith "not pair: foldr"
-  in fold  l
+  in impl  l
 
 let display a =
     print_string (printval a); flush stdout; UnitV
@@ -288,40 +293,25 @@ let symbolp = function
     (* (apply + 1 2 '(3 4))  : 10 *)
 
 (* propper listであれば valtype listにする *)
-let rec qqq : valtype -> valtype list = function
+let rec qqq : 'a valtype -> 'a valtype list = function
   | EmptyListV -> []
   | PairV (a, b) -> !a :: qqq !b
   | _ -> failwith "apply: not list"
 (* 最後の引数が,listであれば、最後の一つ前までをリストとして、最後の引数をappendする *)
-let rec ppp : valtype list -> valtype list = function
-    [] -> failwith "apply: no args"
+let rec ppp : 'a valtype list -> 'a valtype list = function
+    [] -> []
   | [a] -> qqq a
   | a :: rest -> a :: (ppp rest)
 
-(*
-let apply (proc : valtype) (args : valtype list) =
-  let rec evalExplist env ids args : env =
-    match (ids, args) with
-      [], [] -> env
-    | id :: b, ex :: d ->
-        (id, ref ex) :: evalExplist env b d
-    | _, _ -> failwith "parameter unmatch" in
-    let newargs = ppp args in
-  (match proc with
-    ProcV (ids, (defs, ex), en) -> (* procには定義リストもある  *)
-      let newenv = extendExplist en ids newargs in
-      let newnewenv = extendletrec newenv defs in
-      evalExp newnewenv ex 
-  | PrimV closure ->
-      closure newargs
-  | _ -> failwith "apply:not proc");;
 
-let apply2 (proc : valtype) (args : valtype list) =
-   eval_apply proc (ppp args)
-*)
+let apply proc args =
+   Eval.eval_apply proc (ppp args)
+
+
+let makePrimV (id, f) = (id, ref (PrimV f))
 
 let primis = 
-   List.map (fun (id, f) -> (id, ref (PrimV f))) [
+   List.map makePrimV [
   ("+", let rec apply = function
     | [IntV i] -> i
     | IntV a :: tl -> a + apply tl 
@@ -445,19 +435,13 @@ let primis =
      | [o; l] -> assoc equalp o l
      | _ -> failwith "Arity mismatch: assoc");
   ("map", function
-       [proc; l] ->
-       let rec map = function
-	 | EmptyListV -> EmptyListV
-	 | PairV(x, rest) ->
-            PairV (ref (eval_apply proc [!x]), ref (map !rest))
-	 | _ -> failwith "not pair: map"
-       in map l
+       [proc; l] -> map proc l
      | _ -> failwith "Arity mismatch: map");
   ("foldl", function
-       [proc; init; l] -> foldlimpl proc init l
+       [proc; init; l] -> foldl proc init l
      | _ -> failwith "Arity mismatch: foldl");
   ("foldr", function
-       [proc; init; l] -> foldrimpl proc init l
+       [proc; init; l] -> foldr proc init l
      | _ -> failwith "Arity mismatch: foldr");
 
   ("write", function 
@@ -476,18 +460,22 @@ let primis =
   ("symbol?", function
        [x] -> BoolV (symbolp x)
      | _ -> failwith "Arity mismatch: symbol?");
-  ("apply_", function
+  ("apply", function
        (x :: y) -> apply x y
      | _ -> failwith "Arity mismatch: apply");
-  ("apply", function
-       (x :: y) -> apply2 x y
-     | _ -> failwith "Arity mismatch: apply2");
-   
+  ("force", function
+       [x] -> apply x []
+     | _ -> failwith "Arity mismatch: force");
   ]
 (*
   List.map (fun (id, f) -> (id, ref (PrimV f))) a
 
  *)
+
+let sparse s = 
+  Sparser.sexpdata Lexer.main (Lexing.from_string s)
+let sp2 s =
+  Sparser.toplevel Lexer.main (Lexing.from_string s)
 
 
 let parse s =
@@ -499,8 +487,8 @@ let parse s =
 let evallex sexps =
   (* let sexps = Sparser.toplevel Lexer.main lexbuf in *)
   let (defs, exp) = Parser.parseBody sexps in
-  let envv = extendletrec primis defs in
-    evalExp envv exp;;
+  let envv = Eval.extendletrec primis defs in
+    Eval.evalExp envv exp;;
 
 let eval s =
   let x = Sparser.toplevel Lexer.main (Lexing.from_string s) in

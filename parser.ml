@@ -5,11 +5,15 @@ open Syntax
 
 type id = string;;
 
+
 type exp =
+(*
     IntExp of int
   | BoolExp of bool
   | CharExp of char
   | StringExp of string
+ *)
+  | SelfEvalExp of sexp
   | VarExp of id
   | UnitExp
   | QuoteExp of sexp
@@ -46,7 +50,11 @@ let rec parseIdlist : sexp list -> id list = function
   | _ -> raise (ParseError "parseIdlist");;
 
 
-
+let rec parseExp : sexp -> exp = function
+  | Int _ | Bool _ | Char _ | String _ as a -> SelfEvalExp a
+  | Id x  -> VarExp x
+  | List x -> parseForm x
+(*
 let rec parseExp : sexp -> exp = function
   | Int x  -> IntExp x
   | Bool x -> BoolExp x
@@ -54,6 +62,7 @@ let rec parseExp : sexp -> exp = function
   | String x -> StringExp x
   | Id x  -> VarExp x
   | List x -> parseForm x
+ *)
 
 and parseForm : sexp list -> exp = function
   | Id "quote" :: rest ->
@@ -63,23 +72,23 @@ and parseForm : sexp list -> exp = function
   | Id "if" :: rest ->
       (match rest with
         [pred; conseq; alt] ->
-           IfExp (parseExp pred, parseExp conseq, parseExp alt)
+          IfExp (parseExp pred, parseExp conseq, parseExp alt)
        |[pred; conseq] ->
-	 IfExp (parseExp pred, parseExp conseq, UnitExp)
+          IfExp (parseExp pred, parseExp conseq, UnitExp)
        | _ -> raise (ParseError "if") )
   | Id "and" :: rest ->
       let rec make = function
-          [] -> BoolExp true
+          [] -> SelfEvalExp (Bool true)
         | [x] -> parseExp x
-        | x :: rest -> IfExp (parseExp x, make rest, BoolExp false) in
+        | x :: rest -> IfExp (parseExp x, make rest, SelfEvalExp (Bool false)) in
       make rest
-  | Id "and_" :: rest ->  AndExp (parseExplist rest)
-  | Id "or" :: rest ->  OrExp (parseExplist rest)
+  | Id "and_" :: rest -> AndExp (parseExplist rest)
+  | Id "or" :: rest -> OrExp (parseExplist rest)
   | Id "lambda" :: rest ->
       (match rest with
         List idlist :: rest ->
-           let ids = parseIdlist idlist and body = parseBody rest in
-           LambdaExp (ids, body)
+          let ids = parseIdlist idlist and body = parseBody rest in
+          LambdaExp (ids, body)
       | _ -> raise (ParseError "lambda") )
   | Id "cond" :: rest ->
       parseClauses' rest
@@ -124,6 +133,10 @@ and parseForm : sexp list -> exp = function
       | _ -> raise (ParseError "set!"))
   | Id "begin" :: rest ->
       BeginExp (parseExplist rest)
+  | Id "delay" :: rest ->
+      (match rest with 
+        [ex] -> LambdaExp ([], ([],parseExp ex))
+      | _ -> raise (ParseError "force"))
   | op :: rest ->
        let opp = parseExp op and args = parseExplist rest in
        ApplyExp (opp, args)
@@ -163,7 +176,7 @@ and parseClauses = function
     [] -> [] (* else節なし  *)
   | List e :: rest ->
       (match e, rest with
-        Id "else" :: body,  [] -> (BoolExp true, List.map parseExp body) :: []
+        Id "else" :: body,  [] -> (SelfEvalExp (Bool true), List.map parseExp body) :: []
       | Id "else" :: _,     _  -> raise (ParseError "else clause is not last")
       | [cond; Id "=>"; fn],_  ->
           let condexp = parseExp cond in

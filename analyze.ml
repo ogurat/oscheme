@@ -5,8 +5,15 @@
 
 open Parser
 
+open Value
+
+(*
+  2014/3/1
+    -rectypes をつけるとコンパイルできる
+ *)
 
 
+(*
 type env = (id * valtype ref) list
 and
 valtype =
@@ -27,22 +34,28 @@ valtype =
 (* analyzeExpが返す型 *)
 and proctype = env -> valtype
 
+
+
 (* interpreter *)
 let rec lookup a : (env -> valtype ref) = function
     [] -> failwith ("runtime: var " ^ a ^ " not exist")
-  | (x, v) :: rest -> if a = x then v else lookup a rest;;
+  | (x, v) :: rest -> if a = x then v else lookup a rest
 
 
 
 (* applyのargsをrefに変換して環境に追加する *)
-let rec extend env ids args : env =
+let rec extend env ids args  =
     match (ids, args) with
       [], [] -> env
     | id :: b, ex :: d ->
         (id, ref ex) :: extend env b d
     | _, _ -> failwith "parameter unmatch"
 
+ *)
 
+type 'a proctype = 'a env -> 'a valtype
+
+(*
 let evalSelf = function
   | IntExp x -> IntV x
   | BoolExp x -> BoolV x
@@ -50,6 +63,13 @@ let evalSelf = function
   | StringExp x -> StringV x
   | UnitExp   -> UnitV
   | _ -> failwith "eval_self"
+ *)
+let rec evalSelf = function
+  | Syntax.Int x -> IntV x
+  | Syntax.Bool x -> BoolV x
+  | Syntax.Char x -> CharV x
+  | Syntax.String x -> StringV x
+
 
 let rec evalQuote = function
     Syntax.Id s -> SymbolV s
@@ -63,9 +83,13 @@ let rec evalQuote = function
       | a :: rest -> PairV (ref (evalQuote a), ref (loop rest)) in
       loop x
 
-let rec analyzeExp : exp -> proctype = function
-  | IntExp _  | BoolExp _  | CharExp _ | StringExp _ | UnitExp as x ->
+let rec analyzeExp  : exp -> 'a proctype = function
+(*
+  | IntExp _  | BoolExp _  | CharExp _ | StringExp _ as x ->
       let result = evalSelf x in (fun _ -> result)
+ *)
+  | SelfEvalExp sexp -> let result = evalSelf sexp in fun _ -> result
+  | UnitExp -> fun _ -> UnitV
   | VarExp x -> fun env -> !(lookup x env)
   | QuoteExp x -> let result = evalQuote x in fun _ -> result
   | IfExp (c, a, b) ->
@@ -79,13 +103,12 @@ let rec analyzeExp : exp -> proctype = function
   | AndExp ls ->
      let args = List.map analyzeExp ls in
      fun env ->
-      let rec loop = function
-        | [] -> BoolV true
-	| [p] -> p env
+      let rec loop result = function
+        | [] -> result
         | p :: rest ->
-            (match p env with
-	       BoolV false -> BoolV false | _ -> loop rest)
-      in loop args
+            (match result with
+	       BoolV false -> BoolV false | _ -> loop (p env) rest)
+      in loop (BoolV true) args
  
   | OrExp ls ->
      let args = List.map analyzeExp ls in
@@ -94,14 +117,14 @@ let rec analyzeExp : exp -> proctype = function
           [] -> result
         | p :: rest ->
             (match result with
-	       BoolV false -> loop (p env) rest | e ->  e)
+	       BoolV false -> loop (p env) rest | e -> e)
       in loop (BoolV false) args
- 
+
   | LambdaExp (ids, (defs, exp)) ->
      let proc = analyzeExp exp
      and dd = List.map (fun (id, ex) -> id, analyzeExp ex) defs in
      fun env ->
-      ProcV (ids, dd, proc, env)
+       ProcV (ids, dd, proc, env)
 
   | ApplyExp (exp, args) ->
      let proc = analyzeExp exp
@@ -123,6 +146,7 @@ let rec analyzeExp : exp -> proctype = function
       let pfn = [id, analyzeExp fn] in
       fun env ->
         let a = extendletrec env pfn in
+        (* todo: pid a ではなく lookup id a でいいかもしれない  *)
 	eval_apply (pid a) (List.map (fun p -> p env) arr)
 
   | LetrecExp (binds, (defs, exp)) ->
@@ -191,20 +215,25 @@ and eval_apply proc args =
    | _  -> failwith "not proc"
   )
 
-and extendletrec env (binds : (id * proctype) list) : env =
+and extendletrec env binds  =
   let rec ext = function
       [] -> env
     | (id, _) :: rest -> (id, ref UnboundV) :: ext rest in
   let newenv = ext binds in
   let rec loop e = function
       [] -> ()
-    | (_, exp) :: rest  ->
+    | (_, pexp) :: rest  ->
 	let (_, v) :: r = e in
-        v := exp newenv; loop r rest
+        v := pexp newenv; loop r rest
   in
   loop newenv binds;
   newenv
 
+
+(*
+let makePrimV (id, f) = (id, ref (PrimV f))
+ *)
+  
 
 
 let pplist =
@@ -212,7 +241,7 @@ let pplist =
       [] -> ""
     | a :: b ->  " " ^ a ^ pprest b in
   function
-      [] -> ""
+      [] -> "()"
     | x :: rest -> "(" ^  x ^ pprest rest ^ ")"
 
 let rec printval = function
@@ -240,8 +269,7 @@ and pppair = function(* PairVの第2要素 *)
 
 
 
-
-let minus (ls :valtype list) =
+let minus (ls :'a valtype list) =
   let rec apply = function
     | [IntV i; IntV j] -> i - j
     | _ -> failwith "Arity mismatch: -"
@@ -297,7 +325,7 @@ let eqp x y =
   | (SymbolV s, SymbolV s2) -> s = s2
   | (EmptyListV, EmptyListV) ->  true
   | StringV a, StringV b -> a == b
-  | VectorV a, VectorV b -> a == b
+(*  | VectorV a, VectorV b -> a == b *)
   | _ ->  false
 
 let eqvp x y =
@@ -311,7 +339,7 @@ let rec equalp x y =
   match (x, y) with
   | a,b when (eqvp a b) ->  true
   | PairV (a, b), PairV (c, d) -> (equalp !a !c) && (equalp !b !d)
-  | VectorV a, VectorV b -> false
+(*  | VectorV a, VectorV b -> false *)
   | _ ->  false
 
 
@@ -332,23 +360,23 @@ let read () =
 
 
 (* propper listであれば valtype listにする *)
-let rec qqq : valtype -> valtype list = function
+let rec qqq : 'a valtype -> 'a valtype list = function
   | EmptyListV -> []
   | PairV (a, b) -> !a :: qqq !b
   | _ -> failwith "apply: not list"
 (* 最後の引数が,listであれば、最後の一つ前までをリストとして、最後の引数をappendする *)
-let rec ppp : valtype list -> valtype list = function
-    [] -> failwith "apply: no args"
+let rec ppp : 'a valtype list -> 'a valtype list = function
+    [] -> []
   | [a] -> qqq a
   | a :: rest -> a :: (ppp rest)
 
 
-let apply (proc : valtype) (args : valtype list) =
+let apply (proc : 'a valtype) (args : 'a valtype list) =
    eval_apply proc (ppp args)
 
 
 let primis = 
-   List.map (fun (id, f) -> (id, ref (PrimV f))) [
+  List.map (fun (id, f) -> (id, ref (PrimV f))) [
   ("+", let rec apply = function
     | [IntV i] -> i
     | IntV a :: tl -> a + apply tl 
@@ -469,6 +497,9 @@ let primis =
   ("apply", function
        (x :: y) -> apply x y
      | _ -> failwith "Arity mismatch: apply2");
+  ("force", function
+       [x] -> apply x []
+     | _ -> failwith "Arity mismatch: force");
 
 
   ("write", function 
@@ -482,22 +513,21 @@ let primis =
   ("read", function
        [] -> read ()
      | _ -> failwith "Arity mismatch: read");
-
-	    ]
+]
 
 
 let parse s =
   parseExp (Sparser.sexpdata Lexer.main (Lexing.from_string s))
 
 
-let analyze s = 
+let analyze s =
   analyzeExp (parse s)
 
 let evallex sexps =
   let (defs, exp) = Parser.parseBody sexps in
   let dd = List.map (fun (id, ex) -> (id, analyzeExp ex)) defs in
   let envv = extendletrec primis dd in
-    (analyzeExp exp) envv;;
+    (analyzeExp exp) envv
 
 let eval s =
   let x = Sparser.toplevel Lexer.main (Lexing.from_string s) in
