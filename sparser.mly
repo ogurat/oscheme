@@ -4,7 +4,7 @@ open Syntax
 
 %token LPAREN RPAREN QUOTE
 %token EOF
-
+%token SHARPSEMICOLON
 %token <int> INTV
 %token <bool> BOOLV
 %token <char> CHARV
@@ -39,3 +39,13 @@ Sexp :
 Sexplist :
  /* empty */ { [] }
   | Sexp Sexplist { $1 :: $2 }
+  | SHARPSEMICOLON Sexp Sexplist { $3 }
+
+/*
+SexpComment :
+    SHARPSEMICOLON Sexp Sexp { $3 }
+  | Sexp SHARPSEMICOLON Sexp { $1 }
+
+SC :
+    SHARPSEMICOLON Sexp {  }
+*/
