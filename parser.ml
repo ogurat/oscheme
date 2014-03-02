@@ -7,12 +7,6 @@ type id = string;;
 
 
 type exp =
-(*
-    IntExp of int
-  | BoolExp of bool
-  | CharExp of char
-  | StringExp of string
- *)
   | SelfEvalExp of sexp
   | VarExp of id
   | UnitExp
@@ -54,15 +48,6 @@ let rec parseExp : sexp -> exp = function
   | Int _ | Bool _ | Char _ | String _ as a -> SelfEvalExp a
   | Id x  -> VarExp x
   | List x -> parseForm x
-(*
-let rec parseExp : sexp -> exp = function
-  | Int x  -> IntExp x
-  | Bool x -> BoolExp x
-  | Char x -> CharExp x
-  | String x -> StringExp x
-  | Id x  -> VarExp x
-  | List x -> parseForm x
- *)
 
 and parseForm : sexp list -> exp = function
   | Id "quote" :: rest ->
@@ -89,7 +74,7 @@ and parseForm : sexp list -> exp = function
         List idlist :: rest ->
           let ids = parseIdlist idlist and body = parseBody rest in
           LambdaExp (ids, body)
-      | _ -> raise (ParseError "lambda") )
+      | _ -> raise (ParseError "lambda"))
   | Id "cond" :: rest ->
       parseClauses' rest
   | Id "cond_" :: rest ->
@@ -140,7 +125,7 @@ and parseForm : sexp list -> exp = function
   | op :: rest ->
        let opp = parseExp op and args = parseExplist rest in
        ApplyExp (opp, args)
-  | _ -> raise (ParseError "unexpected )")
+  | [] -> raise (ParseError "empty form")
 
 and parseExplist (l : sexp list) =
   List.map parseExp l

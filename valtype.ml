@@ -33,22 +33,6 @@ let rec lookup a : ('a env -> 'a valtype ref) = function
 
 
 
-(* schemeの値の真偽を評価する bool値のfalseだけが偽と評価されその他は真と評価される *)
-let truep = function
-  BoolV false -> false
-| _           -> true
-
-
-(*
-primis = ("#t", ref (BoolV true)) :: primis;;
-primis = ("#f", ref (BoolV false)) :: primis;;
-  *)
-
-(*
-let rec appendenv env = function
-    [] -> env
-  |  a :: rest -> appendenv (a :: env) rest;;
- *)
 
 (* applyのargsをrefに変換して環境に追加する *)
 let rec extend env ids args  =
@@ -64,3 +48,22 @@ and evalextend eval env : (id * exp) list -> 'a env = function (* fold_right *)
   | (id, x) :: rest ->
        (id, ref (eval env x)) :: evalextend eval env  rest
 
+
+let rec evalSelf = function
+  | Syntax.Int x -> IntV x
+  | Syntax.Bool x -> BoolV x
+  | Syntax.Char x -> CharV x
+  | Syntax.String x -> StringV x
+
+
+let rec evalQuote = function
+    Syntax.Id s -> SymbolV s
+  | Syntax.Bool x -> BoolV x
+  | Syntax.Char x -> CharV x
+  | Syntax.String x -> StringV x
+  | Syntax.Int x -> IntV x
+  | Syntax.List x -> 
+      let rec loop = function
+        [] -> EmptyListV
+      | a :: rest -> PairV (ref (evalQuote a), ref (loop rest)) in
+      loop x

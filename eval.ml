@@ -2,92 +2,11 @@
 
 open Parser
 
-open Value
+open Valtype
 
-(*
-type env = (id * valtype ref) list
-and valtype =
-    IntV of int
-  | BoolV of bool
-  | CharV of char
-  | StringV of string
-  | SymbolV of id
-  | ProcV of id list * (id * exp) list * exp * env
-  | PrimV of (valtype list -> valtype) 
-  | PairV of valtype ref * valtype ref
-  | EmptyListV
-(*  | ProperListV of valtype list *)
-(* list?の判定が定数時間で完了する。空リストを認めないとpair?の判定が簡単になる。ただしcdrの操作に注意が必要 *)
-  | VectorV of valtype array
-  | UnitV
-  | UnboundV
-
-
-(* interpreter *)
-let rec lookup a : (env -> valtype ref) = function
-    [] -> failwith ("runtime: var " ^ a ^ " not exist")
-  | (x, v) :: rest -> if a = x then v else lookup a rest
-
-
-
-(* schemeの値の真偽を評価する bool値のfalseだけが偽と評価されその他は真と評価される *)
-let truep = function
-  BoolV false -> false
-| _           -> true
-
-
-(*
-primis = ("#t", ref (BoolV true)) :: primis
-primis = ("#f", ref (BoolV false)) :: primis
-  *)
-
-let rec appendenv env = function
-    [] -> env
-  |  a :: rest -> appendenv (a :: env) rest
-
-(* applyのargsをrefに変換して環境に追加する *)
-let rec extend env ids args  =
-    match (ids, args) with
-      [], [] -> env
-    | id :: b, ex :: d ->
-        (id, ref ex) :: extend env b d
-    | _, _ -> failwith "parameter unmatch"
-
- 
-
-and evalextend eval env : (id * exp) list -> env = function (* fold_right *)
-    [] -> env
-  | (id, x) :: rest ->
-       (id, ref (eval env x)) :: evalextend eval env  rest
- *)
-
-let rec evalSelf = function
-  | Syntax.Int x -> IntV x
-  | Syntax.Bool x -> BoolV x
-  | Syntax.Char x -> CharV x
-  | Syntax.String x -> StringV x
-
-
-let rec evalQuote = function
-    Syntax.Id s -> SymbolV s
-  | Syntax.Bool x -> BoolV x
-  | Syntax.Char x -> CharV x
-  | Syntax.String x -> StringV x
-  | Syntax.Int x -> IntV x
-  | Syntax.List x ->
-      let rec loop = function
-        [] -> EmptyListV
-      | a :: rest -> PairV (ref (evalQuote a), ref (loop rest)) in
-      loop x
 
 
 let rec evalExp env = function
-(*
-  | IntExp x -> IntV x
-  | BoolExp x -> BoolV x
-  | CharExp x -> CharV x
-  | StringExp x -> StringV x
- *)
   | SelfEvalExp sexp -> evalSelf sexp
   | UnitExp -> UnitV
   | VarExp x -> !(lookup x env)
@@ -153,11 +72,6 @@ let rec evalExp env = function
        | [x] -> evalExp env x
        | x :: rest -> evalExp env x; loop rest in
      loop exps
-(*
-      let result = ref UnitV in
-      List.iter (fun x -> result := evalExp env x) explist;
-      !result
- *)
 
 and eval_apply proc args =
   (match proc with
@@ -170,12 +84,6 @@ and eval_apply proc args =
   | UnboundV -> failwith "unbound proc!"
   | _ -> failwith "not proc")
 
-
-(*
-and extendlet' env a = function (* fold_left *)
-    [] -> a
-  | (id, x) :: rest -> extendlet' env ((id, ref (evalExp env x)) :: a) rest
- *)
 
 and extendletrec env binds : 'a env =
   let rec ext = function
@@ -191,15 +99,3 @@ and extendletrec env binds : 'a env =
   loop newenv binds;
   newenv
 
-(*
-and extendletrec' env binds : env =  (* fold_left *)
-  let rec ext a = function
-      [] -> a
-    | (id, _) :: rest -> ext ((id, ref UnboundV) :: a) rest in
-  let newenv = ext env binds in
-  List.iter (fun (id, ex) ->
-	     let a = lookup id newenv in
-	     a := evalExp newenv ex)
-	    binds;
-  newenv
- *)

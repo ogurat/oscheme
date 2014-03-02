@@ -1,33 +1,11 @@
 (* oschme scheme.ml *)
 
 open Parser
-open Value
+open Valtype
 
 
 
 (* primitives *)
-
-(*
-let print_env env =
-  List.iter 
-    (fun (id, v) ->
-      (match !v with
-        IntV x  -> print_string (id ^ ":" ^ string_of_int x)
-      | ProcV _ -> print_string id;
-      | _ -> ()  );
-      print_string ";"
-    )
-    env
-*)
-
-
-let pplist =
-  let rec pprest = function
-      [] -> ""
-    | a :: b ->  " " ^ a ^ pprest b in
-  function
-      [] -> "()"
-    | x :: rest -> "(" ^  x ^ pprest rest ^ ")"
 
 
 let rec printval = function
@@ -37,7 +15,14 @@ let rec printval = function
   | SymbolV x ->  (x)
   | StringV x ->  x (* "\"" ^ x ^ "\"" *)
   | ProcV (args, deflist, _, env) ->
-       "#proc:" ^ (pplist args)
+     let rec pprest = function
+	 [] -> ""
+       | a :: b ->  " " ^ a ^ pprest b in
+     "#proc:" ^ (
+       (function
+	   [] -> "()"
+	 | x :: rest -> "(" ^  x ^ pprest rest ^ ")")
+	 args)
   | PrimV _ ->  "primitive"
   | PairV (a, b) ->  "(" ^ printval !a ^ pppair !b ^ ")"
   | EmptyListV ->  "()"
@@ -51,13 +36,18 @@ and pppair = function(* PairVの第2要素 *)
 
 
 
-let stolistt s = []
+(* schemeの値の真偽を評価する bool値のfalseだけが偽と評価されその他は真と評価される *)
+let truep = function
+  BoolV false -> false
+| _           -> true
+
+
 
 let read () =
   let buf = Lexing.from_channel stdin in
   (* let buf = Lexing.from_string (input_line  stdin) in *) (* 本来 1s式をよむ。次の readで残りのs  *)
   let sexp = Sparser.sexpdata Lexer.main buf in
-     Eval.evalQuote sexp
+     evalQuote sexp
 
 let chareq a b = BoolV (a = b)
 
@@ -248,30 +238,6 @@ let assoc pred o l =
   in loop l
 
 
-let map proc l =
-  let rec impl = function
-    | EmptyListV -> EmptyListV
-    | PairV(x, rest) ->
-        PairV (ref (Eval.eval_apply proc [!x]), ref (impl !rest))
-    | _ -> failwith "not pair: map"
-  in impl l
-
-let foldl proc init l =
-  let rec impl accum = function
-    | EmptyListV -> accum
-    | PairV(x, rest) ->
-        impl (Eval.eval_apply proc [!x;accum]) !rest
-    | _ -> failwith "not pair: foldl"
-  in impl init l
-
-let foldr proc init l =
-  let rec impl = function
-    | EmptyListV -> init
-    | PairV(x, rest) ->
-        let a = impl !rest in
-        Eval.eval_apply proc [!x;a]
-    | _ -> failwith "not pair: foldr"
-  in impl  l
 
 let display a =
     print_string (printval a); flush stdout; UnitV
@@ -289,6 +255,8 @@ let symbolp = function
   | _ ->  false
 
 
+
+
 (* apply primitive *)
     (* (apply + 1 2 '(3 4))  : 10 *)
 
@@ -303,14 +271,41 @@ let rec ppp : 'a valtype list -> 'a valtype list = function
   | [a] -> qqq a
   | a :: rest -> a :: (ppp rest)
 
+(* global environment *)
+let ge eval_apply =
 
 let apply proc args =
-   Eval.eval_apply proc (ppp args)
+   eval_apply proc (ppp args)
 
 
-let makePrimV (id, f) = (id, ref (PrimV f))
+and map proc l =
+  let rec impl = function
+    | EmptyListV -> EmptyListV
+    | PairV(x, rest) ->
+        PairV (ref (eval_apply proc [!x]), ref (impl !rest))
+    | _ -> failwith "not pair: map"
+  in impl l
 
-let primis = 
+and foldl proc init l =
+  let rec impl accum = function
+    | EmptyListV -> accum
+    | PairV(x, rest) ->
+        impl (eval_apply proc [!x;accum]) !rest
+    | _ -> failwith "not pair: foldl"
+  in impl init l
+
+and foldr proc init l =
+  let rec impl = function
+    | EmptyListV -> init
+    | PairV(x, rest) ->
+        let a = impl !rest in
+        eval_apply proc [!x;a]
+    | _ -> failwith "not pair: foldr"
+  in impl  l
+
+
+and makePrimV (id, f) = (id, ref (PrimV f))
+in
    List.map makePrimV [
   ("+", let rec apply = function
     | [IntV i] -> i
@@ -467,62 +462,4 @@ let primis =
        [x] -> apply x []
      | _ -> failwith "Arity mismatch: force");
   ]
-(*
-  List.map (fun (id, f) -> (id, ref (PrimV f))) a
 
- *)
-
-let sparse s = 
-  Sparser.sexpdata Lexer.main (Lexing.from_string s)
-let sp2 s =
-  Sparser.toplevel Lexer.main (Lexing.from_string s)
-
-
-let parse s =
-  parseExp (Sparser.sexpdata Lexer.main (Lexing.from_string s))
-
-
-(* 環境を先に評価すると定義の順序が問題となる *)
-(* 環境をlookupしたときに評価すべきか *)
-let evallex sexps =
-  (* let sexps = Sparser.toplevel Lexer.main lexbuf in *)
-  let (defs, exp) = Parser.parseBody sexps in
-  let envv = Eval.extendletrec primis defs in
-    Eval.evalExp envv exp;;
-
-let eval s =
-  let x = Sparser.toplevel Lexer.main (Lexing.from_string s) in
-  printval (evallex x)
-
-
-let lex_from name =
-  let f = open_in name in
-  try
-    let s = Sparser.toplevel Lexer.main (Lexing.from_channel f) in
-    close_in f; s
-  with Failure msg -> close_in f; raise (Failure msg)
-
-let interpret name =
-   printval (evallex (lex_from name))
-
-
-(*
-let binda = [("a", IntExp 1); ("b", IntExp 4); ("c", IntExp 5)];;
-
-let exttest =
- (extendletrec primis binda, extendletrec' primis binda)
-*)
-
-
-
-let _ =
-  let fn = ref [] in
-  Arg.parse [] (fun s -> fn := s :: !fn) "";
-   if List.length !fn > 0 then
-  print_endline (interpret (List.hd !fn))
-else ()
-
-
-(*
-ocaml sparser.cmo  parser.cmo lexer.cmo eval.cmo scheme.cmo
-*)
