@@ -265,9 +265,9 @@ let rec qqq : 'a valtype -> 'a valtype list = function
   | EmptyListV -> []
   | PairV (a, b) -> !a :: qqq !b
   | _ -> failwith "apply: not list"
-(* 最後の引数が,listであれば、最後の一つ前までをリストとして、最後の引数をappendする *)
+(* 最後の引数の一つ前までをリストとし、最後の引数をappendする *)
 let rec ppp : 'a valtype list -> 'a valtype list = function
-    [] -> []
+    [] -> failwith "apply: no arguments"
   | [a] -> qqq a
   | a :: rest -> a :: (ppp rest)
 
@@ -308,12 +308,12 @@ and makePrimV (id, f) = (id, ref (PrimV f))
 in
    List.map makePrimV [
   ("+", let rec apply = function
-    | [IntV i] -> i
+    | [] -> 0
     | IntV a :: tl -> a + apply tl 
     | _ -> failwith "Arity mismatch: +"
   in fun args -> IntV (apply args));
   ("*", let rec apply = function
-    | [IntV i] -> i
+    | [] -> 1
     | IntV a :: tl -> a * apply tl 
     | _ -> failwith "Arity mismatch: +"
   in fun args -> IntV (apply args));
@@ -336,13 +336,13 @@ in
      | _ -> failwith "Arity mismatch: equal?");
   ("=", function
        [x;y] -> BoolV (eq x y)
-     | _ -> failwith "Arity mismatch: equal?");
+     | _ -> failwith "Arity mismatch: =");
   ("<",  function
     | [IntV i; IntV j] -> BoolV (i < j)
-    | _ -> failwith "Arity mismatch: =");
+    | _ -> failwith "Arity mismatch: <");
   (">",  function
     | [IntV i; IntV j] -> BoolV (i > j)
-    | _ -> failwith "Arity mismatch: =");
+    | _ -> failwith "Arity mismatch: >");
   ("number?", function
        [x] -> BoolV (numberp x)
      | _ -> failwith "Arity mismatch: number?");
@@ -459,7 +459,7 @@ in
        (x :: y) -> apply x y
      | _ -> failwith "Arity mismatch: apply");
   ("force", function
-       [x] -> apply x []
+       [x] -> apply x [EmptyListV]
      | _ -> failwith "Arity mismatch: force");
   ]
 

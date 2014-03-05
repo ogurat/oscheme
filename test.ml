@@ -51,8 +51,6 @@ let cases2 = ("../scm/lettest.scm", [
 ("(ff 10 5)", Ex "'(65 50 750 9)");
 ("(mapsquare '(3 4 5))", Ex "'(9 16 25)");
 
-
-
 	       ])
 
 
@@ -83,9 +81,10 @@ let sexps_from name =
     close_in f; s
   with Failure msg -> close_in f; raise (Failure msg)
 
+(*
 let interpret name =
    Scheme.printval (evalall (sexps_from name))
-
+ *)
 
 
 let exec eval env (s, v) =

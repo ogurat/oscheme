@@ -26,7 +26,7 @@ type exp =
 and define = id * exp
 and body = define list * exp
 and condclause = 
-   FUN of exp * exp * exp
+   ARROW of exp * exp * exp
  | VAL of exp * exp
 
 
@@ -38,16 +38,37 @@ and condclause =
 exception ParseError of string
 
 
+let rec to_list a = function
+    | List x -> a :: x
+    | Cons (x, y) -> a :: to_list x y
+    | _ -> raise (ParseError "not propper list")
+
+let rec to_list2 = function
+    | List x ->  x
+    | Cons (x, y) -> x :: to_list2 y
+    | x -> [x]
+
+
 let rec parseIdlist : sexp list -> id list = function
   | [] -> []
   | Id id :: rest -> id :: parseIdlist rest
-  | _ -> raise (ParseError "parseIdlist");;
+  | _ -> raise (ParseError "parseIdlist")
 
+
+let body_to_exp = function
+    [x] -> x
+  | x -> BeginExp x
 
 let rec parseExp : sexp -> exp = function
   | Int _ | Bool _ | Char _ | String _ as a -> SelfEvalExp a
   | Id x  -> VarExp x
   | List x -> parseForm x
+  | Cons _ -> raise (ParseError "dot pair") 
+   (* sparserが できる限りListにしているのに依存 *)
+(*
+  | Cons (x, y) ->
+       parseForm (to_list x y)
+ *)
 
 and parseForm : sexp list -> exp = function
   | Id "quote" :: rest ->
@@ -77,8 +98,6 @@ and parseForm : sexp list -> exp = function
       | _ -> raise (ParseError "lambda"))
   | Id "cond" :: rest ->
       parseClauses' rest
-  | Id "cond_" :: rest ->
-      clausestoif rest
   | Id "let_" :: rest ->
       (match rest with
       | Id var :: List binds :: body ->
@@ -149,13 +168,14 @@ and parseClauses' = function
         Id "else" :: body,  [] -> body_to_exp (List.map parseExp body)
       | Id "else" :: _,     _  -> raise (ParseError "else clause is not last")
       | [cond; Id "=>"; fn],_  ->
-	  CondClauseExp (FUN (parseExp cond, parseExp fn, parseClauses' rest))
+	  CondClauseExp (ARROW (parseExp cond, parseExp fn, parseClauses' rest))
       | cond :: [],         _  ->
 	  CondClauseExp (VAL (parseExp cond, parseClauses' rest))
       | cond :: body, _  ->
           let v = body_to_exp (List.map parseExp body) in
 	  IfExp (parseExp cond, v, parseClauses' rest))
   | _ -> raise (ParseError "cond clause")
+
 
 and parseClauses = function
     [] -> [] (* else節なし  *)
@@ -174,20 +194,25 @@ and parseClauses = function
       | [],                 _  -> failwith "not concidered")
   | _ -> raise (ParseError "cond clause")
 
+(*
 and clausestoif clauses = 
   List.fold_right (fun (e, body) y -> IfExp (e, body_to_exp body, y))
                   (parseClauses clauses)
                   (UnitExp)
-
-and body_to_exp = function
-    [x] -> x
-  | x -> BeginExp x
+ *)
 
 (* 定義は[本体]の先頭で有効 *)
 and parseDef : sexp list -> define = function
   | List (Id id :: rest) :: l -> 
       let ids = parseIdlist rest and body = parseBody l in
       id, LambdaExp (ids, body)
+  | Cons (Id id, rest) :: l ->
+     raise (ParseError "(define dot list ")
+(*
+     let a = to_list2 rest in
+      let ids = parseIdlist rest and body = parseBody l in
+      id, LambdaExp (ids, body)
+ *)
   | [Id id; ex] -> 
       (* let c = parseExp ex in *)
       id, parseExp ex
@@ -229,60 +254,3 @@ let rec parseProg : sexp list -> prog = function
        | Var v -> (fl, v :: vl, exp))
   | ex :: _ -> let c = parseExp ex in ([], [], c);;
 
-
-
-(*
-
-open Manualparser
-
-let ptest (x: token list)  =
- let (a, _) = parse x  and b = parseexps x in
-  parseDef a, parseProg b;;
-
-let pl x = let b = parseexps x in parseBody b
-let p x = let (b, _) = parse x in parseExp b;;
-
-
-p (lexer "123");;
-p (lexer "abc");;
-p (lexer "(f 1 2 3)");;
-p (lexer "(g (a 5))");;
-
-
-let x = lexer "(define (f x y z) (g (+ x 1)) ) (f 1 2 3) " in
-  ptest x;;
-let y = lexer "(define (f x) (* x x))  (define (g x) (+ x x)) (define a 10)  (+ (f 2) a)" in
-  ptest y;;
-
-(*
-ptest (lexer "(define (f x) (define (loop y) (+ y x))  (define (loop2 y z) (+ y x))  loop)   (f 4)");;
-*)
-p (lexer "((f 4) 5)");; 
-p (lexer "(f a (g 4 6) 10 11)");;
-let a  = lexer "(let ((a (+ 10 5)) (b (* 7 8))) (+ a b))" in
-  p a;;
-let a = lexer "(define (f i j) (let ((a (+ i j))  (b (* i j))) (+ a b)))   (f 10 5)" in
-  ptest a;;
-
-let a = lexer "(lambda (a b) (+ a b))" in
-  p a;;
-let a = lexer "((lambda (a b) (+ a b)) 1 2)" in
-  p a;;
-
-let a = lexer "(define f (lambda (x y) (+ x y)))   (f 1 2)" in
-  ptest a;;
-let a = lexer "(define (f x y) (+ x y))   (f 1 2)" in
-  ptest a;;
-
-let a = lexer "(define (func x y) ((lambda (a b) (+ a b)) x y))  (func 10 5)" in
-  ptest a;;
-
-(*
-let a = lexer "(define (func x y) (define s 10) (+ s x y))  (func 10 5)" in
-  ptest a;;
-*)
-
-let a = lexer "(define (a x) (* x x)) (define h 6)  (+ h 10)" in
-  ptest a;;
-
-*)

@@ -54,15 +54,7 @@ let rec evalExp env = function
       let b = extendletrec a defs in
       evalExp b exp
   | CondClauseExp x ->
-      (match x with
-	FUN (cond, ret, alt) ->
-	 (match evalExp env cond with
-	    BoolV false -> evalExp env alt
-	  | e -> eval_apply (evalExp env ret) [e])
-      | VAL (cond, alt) ->
-	 (match evalExp env cond with
-	  | BoolV false -> evalExp env alt | e -> e)
-      )
+     eval_cond env x
   | SetExp (id, exp) ->
       let a = lookup id env in
       a := (evalExp env exp); UnitV
@@ -72,6 +64,15 @@ let rec evalExp env = function
        | [x] -> evalExp env x
        | x :: rest -> evalExp env x; loop rest in
      loop exps
+
+and eval_cond env = function
+    ARROW (cond, ret, alt) ->
+     (match evalExp env cond with
+        BoolV false -> evalExp env alt
+      | e -> eval_apply (evalExp env ret) [e])
+  | VAL (cond, alt) ->
+     (match evalExp env cond with
+      | BoolV false -> evalExp env alt | e -> e)
 
 and eval_apply proc args =
   (match proc with

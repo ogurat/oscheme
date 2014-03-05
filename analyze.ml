@@ -90,21 +90,7 @@ let rec analyzeExp  : exp -> 'a proctype = function
        e b
 
   | CondClauseExp x ->
-      (match x with
-	FUN (cond, conseq, alt) ->
-	 let pcond = analyzeExp cond
-	 and pcon = analyzeExp conseq
-	 and palt = analyzeExp alt in
-	 fun env -> (match pcond env with
-		       BoolV false -> palt env
-		     | e -> eval_apply (pcon env) [e])
-      | VAL (cond, alt) ->
-	 let pcond = analyzeExp cond
-	 and palt = analyzeExp alt in
-	 fun env -> (match pcond env with
-		      | BoolV false -> palt env | e -> e)
-      )
- 
+     analyze_cond x 
   | SetExp (id, exp) ->
      let e = analyzeExp exp in
      fun env ->
@@ -112,6 +98,22 @@ let rec analyzeExp  : exp -> 'a proctype = function
        a := (e env); UnitV
   | BeginExp exps ->
      analyze_seq exps
+
+and analyze_cond = function
+    ARROW (cond, conseq, alt) ->
+      let pcond = analyzeExp cond
+      and pcon = analyzeExp conseq
+      and palt = analyzeExp alt in
+      fun env ->
+        (match pcond env with
+           BoolV false -> palt env
+         | e -> eval_apply (pcon env) [e])
+  | VAL (cond, alt) ->
+     let pcond = analyzeExp cond
+     and palt = analyzeExp alt in
+     fun env ->
+       (match pcond env with
+	| BoolV false -> palt env | e -> e)
 
 and analyze_seq exps =
 (*
