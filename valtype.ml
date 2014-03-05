@@ -67,3 +67,5 @@ let rec evalQuote = function
         [] -> EmptyListV
       | a :: rest -> PairV (ref (evalQuote a), ref (loop rest)) in
       loop x
+  | Syntax.Cons (x, y) ->
+     PairV (ref (evalQuote x), ref (evalQuote y))

@@ -8,4 +8,5 @@ type sexp =
   | Char of char
   | String of string
   | Id of string
-  | List of sexp list  
+  | List of sexp list
+  | Cons of sexp * sexp

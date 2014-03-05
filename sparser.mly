@@ -2,7 +2,7 @@
 open Syntax
 %}
 
-%token LPAREN RPAREN QUOTE
+%token LPAREN RPAREN QUOTE DOT
 %token EOF
 %token SHARPSEMICOLON
 %token <int> INTV
@@ -35,11 +35,27 @@ Sexp :
   | ID { Id $1 }
   | STRINGV { String $1 }
   | LPAREN Sexplist RPAREN { List $2 }
+  | LPAREN Dotpair RPAREN { $2 }
   | QUOTE Sexp { List [Id "quote"; $2]}
 Sexplist :
  /* empty */ { [] }
   | Sexp Sexplist { $1 :: $2 }
   | SHARPSEMICOLON Sexp Sexplist { $3 }
+Dotpair :
+  | Sexp DOT Sexp  {
+           match $3 with
+           | List x -> List ($1 :: x)
+           | _ -> Cons ($1, $3)
+	 }
+  | Sexp Dotpair {
+           match $2 with
+             List x -> List ($1 :: x)
+           | _ -> Cons ($1, $2)
+	 }
+/*
+  | Sexp DOT Sexp  { Cons ($1, $3) }
+  | Sexp Dotpair { Cons ($1, $2) }
+*/
 
 /*
 SexpComment :
