@@ -64,6 +64,8 @@ let rec evalExp env = function
        | [x] -> evalExp env x
        | x :: rest -> evalExp env x; loop rest in
      loop exps
+  | SeqExp (a, b) ->
+     evalExp env a; evalExp env b
 
 and eval_cond env = function
     ARROW (cond, ret, alt) ->

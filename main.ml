@@ -3,13 +3,16 @@
 open Scheme
 
 
-let sexps_from name =
+let withfile proc name =
   let f = open_in name in
   try
-    let s = Sparser.toplevel Lexer.main (Lexing.from_channel f) in
-    close_in f; s
+    let a = proc f in
+    close_in f; a
   with Failure msg -> close_in f; raise (Failure msg)
 
+
+let sexps_from =
+  withfile (fun f -> Sparser.toplevel Lexer.main (Lexing.from_channel f))
 
 
 

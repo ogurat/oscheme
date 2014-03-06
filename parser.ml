@@ -23,6 +23,7 @@ type exp =
   | CondClauseExp of condclause
   | SetExp of id * exp
   | BeginExp of exp list
+  | SeqExp of exp * exp
 and define = id * exp
 and body = define list * exp
 and condclause = 
@@ -54,10 +55,10 @@ let rec parseIdlist : sexp list -> id list = function
   | Id id :: rest -> id :: parseIdlist rest
   | _ -> raise (ParseError "parseIdlist")
 
-
-let body_to_exp = function
-    [x] -> x
-  | x -> BeginExp x
+let rec body_to_exp = function
+    [] -> raise (ParseError "empty body")
+  | [x] -> x
+  | x :: rest -> SeqExp (x, body_to_exp rest)
 
 let rec parseExp : sexp -> exp = function
   | Int _ | Bool _ | Char _ | String _ as a -> SelfEvalExp a
@@ -95,6 +96,8 @@ and parseForm : sexp list -> exp = function
         List idlist :: rest ->
           let ids = parseIdlist idlist and body = parseBody rest in
           LambdaExp (ids, body)
+      | Cons (x, y) :: rest ->
+          raise (ParseError "lambda doted id list")
       | _ -> raise (ParseError "lambda"))
   | Id "cond" :: rest ->
       parseClauses' rest
@@ -136,7 +139,7 @@ and parseForm : sexp list -> exp = function
         [Id id; ex] -> SetExp (id, parseExp ex)
       | _ -> raise (ParseError "set!"))
   | Id "begin" :: rest ->
-      BeginExp (parseExplist rest)
+      body_to_exp (parseExplist rest)
   | Id "delay" :: rest ->
       (match rest with 
         [ex] -> LambdaExp ([], ([],parseExp ex))
@@ -219,14 +222,18 @@ and parseDef : sexp list -> define = function
   | _ -> raise (ParseError " not (define ")
 
 and parseBody : sexp list -> body = function
-  | [] -> raise (ParseError " parse body ")
+  | [] -> raise (ParseError " parse body: empty body ")
   | List (Id "define" :: x) :: rest ->
       let def = parseDef x and (defs, e) = parseBody rest in
       (def :: defs), e
-  | [exp] -> [], parseExp exp
   | exl -> let a = List.map parseExp exl in
-	   [], BeginExp a
-  (* | l :: rest -> let (c) = parseExp l in ([], c)  *);;
+	   [], body_to_exp a
+
+let rec parseDefs = function
+  | List (Id "define" :: x) :: rest ->
+      let def = parseDef x and (defs,l) = parseDefs rest in
+      def :: defs, l
+  | exl -> [], List.map parseExp exl
 
 
 

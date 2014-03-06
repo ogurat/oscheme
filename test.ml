@@ -14,11 +14,7 @@ let pairab =  PairV ( a,  b)
 let proc =  ProcV (["x";"y"], [], (fun _ -> UnitV), [])
 let procnn =  ProcV (["nn"], [], (fun _ -> UnitV), [])
 
-let cases = ("../scm/b.scm", [
-
-(*
-("fact", V procnn);
- *)
+let bcase = ("../scm/b.scm", [
 
 
 ("((lambda (x) (* x x)) 4)", Ex "16");
@@ -28,6 +24,8 @@ let cases = ("../scm/b.scm", [
 ("(dotp 'a 'b 'c)", Ex "'(c c c a a (a . b) (a . b) (a . b))");
 ("(dotp #f 'a 'b)", Ex "'(#f #f #f a a (#f . a) (#f . a) (#f . a))");
 
+("((aaa 2 3))", V (IntV 5)) ;
+("((aaa 3 2))", V (IntV 6)) ;
 ("(a1 5)", Ex "'((#f #f #f #t) (120 120 120))");
 ("(a1 4)", Ex "'((#t #t #t #f) (24 24 24))");
 ("(a2 4 5)", Ex "'(4 9 13 22 29 4 20 80 400)");
@@ -43,7 +41,7 @@ let cases = ("../scm/b.scm", [
 
 ])
 
-let cases2 = ("../scm/lettest.scm", [
+let lettestcase = ("../scm/lettest.scm", [
 
 
 ("(fibs)",  Ex "'((3 5 2584 4181 6765) (3 5 2584 4181 6765) (3 5 2584 4181 6765) (3 5 2584 4181 6765) (16 25 324 361 400))");
@@ -52,6 +50,26 @@ let cases2 = ("../scm/lettest.scm", [
 ("(mapsquare '(3 4 5))", Ex "'(9 16 25)");
 
 	       ])
+
+let bodycase = ("../scm/body.scm", [
+
+"(a1 5 4)", V (IntV 20) ;
+"(a3 5 4)", V (IntV 9) ;
+"(a3 4 5)", V (SymbolV "q") ;
+
+"(a4 1 2)", V (SymbolV "c") ;
+"(a4 2 1)", V (SymbolV "y") ;
+"(a4 2 2)", V (SymbolV "h") ;
+
+"(fib 6)",  V (IntV 8) ;
+"(a7 3 4)", V (IntV 12) ;
+"(a7 4 3)", V (IntV 7) ;
+
+	       ])
+
+let sicp = ("../scm/sicp4.scm", [
+  "(replanalyze)", Ex "'()"
+	     ])
 
 
 let sparse s = 
@@ -74,12 +92,17 @@ let  eval s =
     Analyze.analyzeExp x primis
 
 
-let sexps_from name =
+let withfile proc name =
   let f = open_in name in
   try
-    let s = Sparser.toplevel Lexer.main (Lexing.from_channel f) in
-    close_in f; s
+    let a = proc f in
+    close_in f; a
   with Failure msg -> close_in f; raise (Failure msg)
+
+
+let sexps_from =
+  withfile (fun f -> Sparser.toplevel Lexer.main (Lexing.from_channel f))
+
 
 (*
 let interpret name =
@@ -98,50 +121,26 @@ try
     with  Invalid_argument msg -> (s, printval vv, false))
 with Failure msg -> (s, msg, false)
 
-(*
-let aexec env (s, v) =
-try 
-  let vv = Analyze.analyzeExp (parse s) env 
-    and ab = (match v with
-		Ex ex -> Analyze.analyzeExp (parse ex) []
-	      | V v -> v) in
-  (try
-       (s, Scheme.printval vv,  vv = ab)
-    with  Invalid_argument msg -> (s, Scheme.printval vv, false))
-
-with Failure msg -> (s, msg, false)
- *)
 
 
 
 let  atest (file, cases) =
   let primis = ge Analyze.eval_apply
-  and  (defs, _) = Parser.parseBody (sexps_from file) in
+  and (defs, _) = Parser.parseDefs (sexps_from file) in
   let dd = List.map (fun (id, ex) -> (id, Analyze.analyzeExp ex)) defs in
   let env = Analyze.extendletrec primis dd in
  List.map (exec Analyze.analyzeExp env) cases
 
-(*
-let eexec env (s, v) =
-try 
-  let vv = Eval.evalExp env (parse s) 
-    and ab = (match v with
-		Ex ex -> Eval.evalExp [] (parse ex)
-	      | V v -> v) in
-  (try
-       (s, Scheme.printval vv,  vv = ab)
-    with  Invalid_argument msg -> (s, Scheme.printval vv, false))
-
-with Failure msg -> (s, msg, false)
- *)
 
 let  etest (file, cases) =
   let primis = ge Eval.eval_apply
-  and  (defs, _) = Parser.parseBody (sexps_from file) in
+  and (defs, _) = Parser.parseDefs (sexps_from file) in
   let env = Eval.extendletrec primis defs in
  List.map (exec (fun exp en-> Eval.evalExp en exp) env) cases
 
 let show_exp (file, _) =
-  let (defs, _) = Parser.parseBody (sexps_from file) in
+  let (defs, _) = Parser.parseDefs (sexps_from file) in
   defs
 
+let def_exp name =
+  List.assoc name

@@ -98,6 +98,9 @@ let rec analyzeExp  : exp -> 'a proctype = function
        a := (e env); UnitV
   | BeginExp exps ->
      analyze_seq exps
+  | SeqExp (a, b) ->
+     let proc1 = analyzeExp a and proc2 = analyzeExp b in
+     fun env -> proc1 env; proc2 env;
 
 and analyze_cond = function
     ARROW (cond, conseq, alt) ->
