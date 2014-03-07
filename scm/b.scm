@@ -8,8 +8,23 @@
 #;(define (equal? x y)
   (= x y))
 
-#;(define (f a b . c)
-  (+ a b))
+(define varf
+  (lambda (a b . c)
+    c))
+
+(define (varf2 . x)
+  (apply + x))
+
+(define (varf3 a b c)
+  (define (f . x)
+    x)
+  (define g 
+    (lambda x
+      x))
+  (cons (f a b c) (g a b c)))
+
+
+
 
 
 (define c
@@ -171,7 +186,7 @@
   )
 
 (define (testdata)
-  (display (list 'true 'bb '(a b c) '(+ 1 2) (car '(a b c)) '() '(quote a) )))
+  (list 'true 'bb '(a b c) '(+ 1 2) (car '(a b c)) '() '(quote a) ))
 
 (define (condtest x s)
  (list
@@ -209,12 +224,12 @@
 
 (begin 
   (display (a1 5))
-  
+
   (display (let ((a (+ 10 5)) (b (* 7 8))) (+ a b))  )
   (display ((lambda (a b) (+ a b)) (+ 10 5) (* 7 8))  ) ;この2つは同じ
   (display (a5 5 6))
   (yonjo 3)
-  (display (list 1 2 3 4))
+  (display (list (varf 'a 'b 'c 'd 'e) (varf2 1 2 3 4) (varf3 'a 'd 'g)))
   ;(display (aaa 7 6)) (display (aaa 6 7))
   
   (testequal)

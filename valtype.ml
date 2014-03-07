@@ -13,7 +13,7 @@ type 'a valtype =
   | CharV of char
   | StringV of string
   | SymbolV of id
-  | ProcV of id list * (id * 'a) list * 'a * 'a env
+  | ProcV of id list * varid * (id * 'a) list * 'a * 'a env
   | PrimV of ('a valtype list -> 'a valtype) 
   | PairV of 'a valtype ref * 'a valtype ref
   | EmptyListV
@@ -35,12 +35,31 @@ let rec lookup a : ('a env -> 'a valtype ref) = function
 
 
 (* applyのargsをrefに変換して環境に追加する *)
-let rec extend env ids args  =
+(*
+let rec extend (env: 'a env) ids args  =
     match (ids, args) with
       [], [] -> env
     | id :: b, ex :: d ->
         (id, ref ex) :: extend env b d
     | _, _ -> failwith "parameter unmatch"
+ *)
+
+let rec arg_to_pair = function
+    [] -> EmptyListV
+  | a :: rest -> PairV (ref a, ref (arg_to_pair rest))
+
+(* applyのargsをrefに変換して環境に追加する *)
+let rec extend_var (env : 'a env) ids varid args =
+    match (ids, args) with
+      [], x ->
+        (match varid with
+           Fixed -> env  (* 固定長のときはxにあまりがあってはいけない  *)
+         | Vararg id -> let cc = arg_to_pair x in
+	    (id, ref cc) :: env)
+    | id :: b, ex :: d ->
+        (id, ref ex) :: extend_var env b varid d
+    | _, _ -> failwith "parameter unmatch"
+
 
 
 and evalextend eval env : (id * exp) list -> 'a env = function (* fold_right *)

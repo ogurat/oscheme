@@ -18,6 +18,9 @@ open Valtype
 type 'a proctype = 'a env -> 'a valtype
 
 
+
+
+
 let rec analyzeExp  : exp -> 'a proctype = function
   | SelfEvalExp sexp -> let result = evalSelf sexp in fun _ -> result
   | UnitExp -> fun _ -> UnitV
@@ -38,8 +41,8 @@ let rec analyzeExp  : exp -> 'a proctype = function
         | [] -> result
         | p :: rest ->
             (match result with
-	       BoolV false -> BoolV false | _ -> loop (p env) rest)
-      in loop (BoolV true) args
+	       BoolV false -> result | _ -> loop (p env) rest) in
+      loop (BoolV true) args
  
   | OrExp ls ->
      let args = List.map analyzeExp ls in
@@ -48,14 +51,13 @@ let rec analyzeExp  : exp -> 'a proctype = function
           [] -> result
         | p :: rest ->
             (match result with
-	       BoolV false -> loop (p env) rest | e -> e)
-      in loop (BoolV false) args
+	       BoolV false -> loop (p env) rest | e -> e)in
+      loop (BoolV false) args
 
-  | LambdaExp (ids, (defs, exp)) ->
+  | LambdaExp (ids, varid, (defs, exp)) ->
      let proc = analyzeExp exp
      and dd = List.map (fun (id, ex) -> id, analyzeExp ex) defs in
-     fun env ->
-       ProcV (ids, dd, proc, env)
+     fun env -> ProcV (ids, varid, dd, proc, env)
 
   | ApplyExp (exp, args) ->
      let proc = analyzeExp exp
@@ -73,7 +75,7 @@ let rec analyzeExp  : exp -> 'a proctype = function
       let (ids, args) = List.split binds
       and pid = analyzeExp (VarExp id) in
       let arr = List.map analyzeExp args
-      and fn = LambdaExp (ids, body) in
+      and fn = LambdaExp (ids, Fixed, body) in
       let pfn = [id, analyzeExp fn] in
       fun env ->
         let a = extendletrec env pfn in
@@ -134,8 +136,8 @@ and analyze_seq exps =
 
 and eval_apply proc args =
   (match proc with
-     ProcV (ids, pdefs, pexp, en) -> (* procには定義リストもある  *)
-      let newenv = extend en ids args in 
+     ProcV (ids, varid, pdefs, pexp, env) -> (* procには定義リストもある  *)
+      let newenv =   extend_var env ids varid args in
       let newnewenv = extendletrec newenv pdefs in
       pexp newnewenv
    | PrimV closure ->

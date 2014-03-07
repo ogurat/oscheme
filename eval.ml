@@ -32,9 +32,9 @@ let rec evalExp env = function
 	     | e -> e)
       in loop (BoolV false) ls
 
-  | LambdaExp (ids, (defs, exp)) ->
+  | LambdaExp (ids, varid, (defs, exp)) ->
      (* deflistは関数が適用された環境で評価されなければならない *)
-      ProcV (ids, defs, exp, env)
+      ProcV (ids, varid, defs, exp, env)
 
   | ApplyExp (exp, args) ->
       let proc = evalExp env exp
@@ -46,7 +46,7 @@ let rec evalExp env = function
       evalExp b exp
   | NamedLetExp (id, binds, body) ->
       let (ids, args) = List.split binds in
-      let fn = LambdaExp (ids, body) in
+      let fn = LambdaExp (ids, Fixed, body) in
       let a = extendletrec env [id, fn] in
       eval_apply (evalExp a (VarExp id)) (List.map (evalExp env) args)
   | LetrecExp (binds, (defs, exp)) ->
@@ -78,8 +78,8 @@ and eval_cond env = function
 
 and eval_apply proc args =
   (match proc with
-    ProcV (ids, defs, exp, en) ->
-      let newenv = extend en ids args in
+    ProcV (ids, varid, defs, exp, env) ->
+      let newenv = extend_var env ids varid args in
       let newnewenv = extendletrec newenv defs in
       evalExp newnewenv exp
   | PrimV closure ->

@@ -14,7 +14,7 @@ type exp =
   | IfExp of exp * exp * exp
   | AndExp of exp list
   | OrExp of  exp list
-  | LambdaExp of id list * body
+  | LambdaExp of id list * varid * body
   | ApplyExp of exp * exp list
   | LetExp    of (id * exp) list * body
   | NamedLetExp of id * (id * exp) list * body
@@ -26,6 +26,9 @@ type exp =
   | SeqExp of exp * exp
 and define = id * exp
 and body = define list * exp
+and varid = 
+   Fixed
+ | Vararg of id
 and condclause = 
    ARROW of exp * exp * exp
  | VAL of exp * exp
@@ -49,6 +52,14 @@ let rec to_list2 = function
     | Cons (x, y) -> x :: to_list2 y
     | x -> [x]
 
+
+
+let rec parseIdCons = function
+(*    | Nil -> ([], Fixed) *)
+  | Cons (Id id, y) ->
+     let (a, b) = parseIdCons y in (id :: a, b)
+  | Id id -> [], Vararg id
+  | _ -> raise (ParseError "parseIdCons")
 
 let rec parseIdlist : sexp list -> id list = function
   | [] -> []
@@ -95,9 +106,13 @@ and parseForm : sexp list -> exp = function
       (match rest with
         List idlist :: rest ->
           let ids = parseIdlist idlist and body = parseBody rest in
-          LambdaExp (ids, body)
-      | Cons (x, y) :: rest ->
-          raise (ParseError "lambda doted id list")
+          LambdaExp (ids, Fixed, body)
+      | Id id :: rest ->
+	  let body = parseBody rest in
+	  LambdaExp ([], Vararg id, body)
+      | Cons _ as x :: rest ->
+	 let (ids, varid) = parseIdCons x and body = parseBody rest in
+	  LambdaExp (ids, varid, body)
       | _ -> raise (ParseError "lambda"))
   | Id "cond" :: rest ->
       parseClauses' rest
@@ -114,7 +129,7 @@ and parseForm : sexp list -> exp = function
       (match rest with
       | Id var :: List binds :: body ->
           let (ids, args) = unzipBindings binds in
-          let fn = LambdaExp (ids, parseBody body) in
+          let fn = LambdaExp (ids, Fixed, parseBody body) in
 	  let l = LetrecExp ([var, fn], ([], VarExp var)) in
           ApplyExp (l, args)
 (*
@@ -125,7 +140,7 @@ and parseForm : sexp list -> exp = function
 *)
       | List binds :: body ->
           let (ids, args) = unzipBindings binds in
-	  let fn = LambdaExp (ids, parseBody body) in
+	  let fn = LambdaExp (ids, Fixed, parseBody body) in
           ApplyExp (fn, args)
       | _ -> raise (ParseError "let"))
   | Id "letrec" :: rest ->
@@ -142,7 +157,7 @@ and parseForm : sexp list -> exp = function
       body_to_exp (parseExplist rest)
   | Id "delay" :: rest ->
       (match rest with 
-        [ex] -> LambdaExp ([], ([],parseExp ex))
+        [ex] -> LambdaExp ([], Fixed, ([],parseExp ex))
       | _ -> raise (ParseError "force"))
   | op :: rest ->
        let opp = parseExp op and args = parseExplist rest in
@@ -168,8 +183,10 @@ and parseClauses' = function
     [] -> UnitExp  (* else節なし  *)
   | List e :: rest ->
       (match e, rest with
-        Id "else" :: body,  [] -> body_to_exp (List.map parseExp body)
-      | Id "else" :: _,     _  -> raise (ParseError "else clause is not last")
+        Id "else" :: body,  [] ->
+	  body_to_exp (List.map parseExp body)
+      | Id "else" :: _,     _  ->
+          raise (ParseError "else clause is not last")
       | [cond; Id "=>"; fn],_  ->
 	  CondClauseExp (ARROW (parseExp cond, parseExp fn, parseClauses' rest))
       | cond :: [],         _  ->
@@ -184,8 +201,10 @@ and parseClauses = function
     [] -> [] (* else節なし  *)
   | List e :: rest ->
       (match e, rest with
-        Id "else" :: body,  [] -> (SelfEvalExp (Bool true), List.map parseExp body) :: []
-      | Id "else" :: _,     _  -> raise (ParseError "else clause is not last")
+        Id "else" :: body,  [] ->
+	  (SelfEvalExp (Bool true), List.map parseExp body) :: []
+      | Id "else" :: _,     _  ->
+	  raise (ParseError "else clause is not last")
       | [cond; Id "=>"; fn],_  ->
           let condexp = parseExp cond in
           let app = ApplyExp (parseExp fn, [condexp]) in
@@ -208,14 +227,10 @@ and clausestoif clauses =
 and parseDef : sexp list -> define = function
   | List (Id id :: rest) :: l -> 
       let ids = parseIdlist rest and body = parseBody l in
-      id, LambdaExp (ids, body)
-  | Cons (Id id, rest) :: l ->
-     raise (ParseError "(define dot list ")
-(*
-     let a = to_list2 rest in
-      let ids = parseIdlist rest and body = parseBody l in
-      id, LambdaExp (ids, body)
- *)
+      id, LambdaExp (ids, Fixed, body)
+  | Cons (Id id,x) :: l ->
+      let (ids, varid) = parseIdCons x and body = parseBody l in
+      id, LambdaExp (ids, varid, body)
   | [Id id; ex] -> 
       (* let c = parseExp ex in *)
       id, parseExp ex

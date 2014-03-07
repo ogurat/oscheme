@@ -11,13 +11,17 @@ type 'a v = V of 'a valtype | Ex of string
 let a = (SymbolV "a") and b = (SymbolV "b")
 let pairab =  PairV ( a,  b)
  *)
-let proc =  ProcV (["x";"y"], [], (fun _ -> UnitV), [])
-let procnn =  ProcV (["nn"], [], (fun _ -> UnitV), [])
+let proc =  ProcV (["x";"y"], Fixed, [], (fun _ -> UnitV), [])
+let procnn =  ProcV (["nn"], Fixed, [], (fun _ -> UnitV), [])
 
 let bcase = ("../scm/b.scm", [
 
 
 ("((lambda (x) (* x x)) 4)", Ex "16");
+
+("(varf 'a 'b 'c 'd 'e)", Ex "'(c d e)" );
+("(varf2 1 2 3 4)",  V (IntV 10));
+("(varf3 'a 'd 'g)", Ex "'((a d g) a d g)");
 
 ("c", Ex "'((b (c . d)) (b (c d)) (b (c d)) (b (c d)) (b (c d)) (b c d) (b c d) (b c d) (b c d) (b c d) (b c d) (b c d) (b c d) (b c . d) (b c . d))");
 
