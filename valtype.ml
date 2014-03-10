@@ -62,10 +62,25 @@ let rec extend_var (env : 'a env) ids varid args =
 
 
 
-and evalextend eval env : (id * exp) list -> 'a env = function (* fold_right *)
+let rec evalextend eval env : (id * exp) list -> 'a env = function (* fold_right *)
     [] -> env
   | (id, x) :: rest ->
        (id, ref (eval env x)) :: evalextend eval env  rest
+
+
+let extendletrec eval (env : 'a env) binds  =
+  let rec ext = function
+      [] -> env
+    | (id, _) :: rest -> (id, ref UnboundV) :: ext rest in
+  let newenv = ext binds in
+  let rec loop e = function
+      [] -> ()
+    | (_, exp) :: rest  ->
+        let (_, v) :: r = e in
+        v := eval exp newenv; loop r rest
+  in
+  loop newenv binds;
+  newenv
 
 
 let rec evalSelf = function

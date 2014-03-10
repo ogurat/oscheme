@@ -20,16 +20,16 @@ let rec evalExp env = function
         | [] -> result
         | a :: rest ->
             (match result with
-	       BoolV false -> BoolV false
-	     | _ -> loop (evalExp env a) rest)
+               BoolV false -> BoolV false
+             | _ -> loop (evalExp env a) rest)
       in loop (BoolV true) ls
   | OrExp ls ->
       let rec loop result = function
         | [] -> result
         | a :: rest ->
             (match result with
-	       BoolV false -> loop (evalExp env a) rest
-	     | e -> e)
+               BoolV false -> loop (evalExp env a) rest
+             | e -> e)
       in loop (BoolV false) ls
 
   | LambdaExp (ids, varid, (defs, exp)) ->
@@ -53,14 +53,13 @@ let rec evalExp env = function
       let a = extendletrec env binds in
       let b = extendletrec a defs in
       evalExp b exp
-  | CondClauseExp x ->
-     eval_cond env x
+  | CondClauseExp x -> eval_cond env x
   | SetExp (id, exp) ->
       let a = lookup id env in
       a := (evalExp env exp); UnitV
   | BeginExp exps ->
      let rec loop = function
-	 [] -> UnitV
+         [] -> UnitV
        | [x] -> evalExp env x
        | x :: rest -> evalExp env x; loop rest in
      loop exps
@@ -87,7 +86,9 @@ and eval_apply proc args =
   | UnboundV -> failwith "unbound proc!"
   | _ -> failwith "not proc")
 
-
+and extendletrec env =
+  Valtype.extendletrec (fun exp env -> evalExp env exp) env
+(*
 and extendletrec env binds : 'a env =
   let rec ext = function
       [] -> env
@@ -96,9 +97,9 @@ and extendletrec env binds : 'a env =
   let rec loop e = function
       [] -> ()
     | (_, exp) :: rest  ->
-	let (_, v) :: r = e in
+        let (_, v) :: r = e in
         v := evalExp newenv exp; loop r rest
   in
   loop newenv binds;
   newenv
-
+ *)

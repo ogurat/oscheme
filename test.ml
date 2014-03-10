@@ -17,8 +17,8 @@ let procnn =  ProcV (["nn"], Fixed, [], (fun _ -> UnitV), [])
 let bcase = ("../scm/b.scm", [
 
 
-("((lambda (x) (* x x)) 4)", Ex "16");
 
+("(do1 '(1 2 3 4))", V (IntV 10) );
 ("(varf 'a 'b 'c 'd 'e)", Ex "'(c d e)" );
 ("(varf2 1 2 3 4)",  V (IntV 10));
 ("(varf3 'a 'd 'g)", Ex "'((a d g) a d g)");
@@ -28,11 +28,16 @@ let bcase = ("../scm/b.scm", [
 ("(dotp 'a 'b 'c)", Ex "'(c c c a a (a . b) (a . b) (a . b))");
 ("(dotp #f 'a 'b)", Ex "'(#f #f #f a a (#f . a) (#f . a) (#f . a))");
 
+
+("(((closure 'a 'b) 'c 'd) 'e ' f)", Ex "'(a b c d e f)") ;
+("(((closure2 'a 'b) 'c 'd) 'e ' f)", Ex "'(a b c d e f)") ;
+
 ("((aaa 2 3))", V (IntV 5)) ;
 ("((aaa 3 2))", V (IntV 6)) ;
 ("(a1 5)", Ex "'((#f #f #f #t) (120 120 120))");
 ("(a1 4)", Ex "'((#t #t #t #f) (24 24 24))");
 ("(a2 4 5)", Ex "'(4 9 13 22 29 4 20 80 400)");
+("(a5 10 5)", Ex "'(65 750 750 750)");
 
 ("(testand)", Ex "'((1 2 #t #f) (1 1 5 7 #t))");
 
@@ -50,8 +55,9 @@ let lettestcase = ("../scm/lettest.scm", [
 
 ("(fibs)",  Ex "'((3 5 2584 4181 6765) (3 5 2584 4181 6765) (3 5 2584 4181 6765) (3 5 2584 4181 6765) (16 25 324 361 400))");
 
-("(ff 10 5)", Ex "'(65 50 750 9)");
-("(mapsquare '(3 4 5))", Ex "'(9 16 25)");
+("(mapsquare '(3 4 5))", Ex "'(9 16 25)") ;
+("(letlist 3 4)", Ex "'(9 8 5)") ;
+("(mapf fourtimes)", Ex "'(16 20 72 76 80)") ;
 
 	       ])
 
@@ -63,6 +69,7 @@ let bodycase = ("../scm/body.scm", [
 
 "(a4 1 2)", V (SymbolV "c") ;
 "(a4 2 1)", V (SymbolV "y") ;
+"(a4 0 2)", V (SymbolV "g") ;
 "(a4 2 2)", V (SymbolV "h") ;
 
 "(fib 6)",  V (IntV 8) ;

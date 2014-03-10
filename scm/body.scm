@@ -18,7 +18,7 @@
   (cond
     ((= x 1) 'a 'b 'c)
     ((= y 1) 'x 'y)
-    ((= x 0) (
+    ((= x 0) 'f 'g)
     (else 'f 'g 'h)))
 
 (define (a5 x y)

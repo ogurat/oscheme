@@ -8,6 +8,11 @@
 #;(define (equal? x y)
   (= x y))
 
+(define (do1 x)
+  (do ((x x (cdr x))
+       (sum 0 (+ sum (car x))))
+    ((null? x) sum)))
+
 (define varf
   (lambda (a b . c)
     c))
@@ -22,8 +27,6 @@
     (lambda x
       x))
   (cons (f a b c) (g a b c)))
-
-
 
 
 
@@ -64,6 +67,27 @@
 (define (dot)
   (cons . ('a . ('b . ()))))
 
+(define closure
+  (lambda (a b)
+    (let ((f1
+      (lambda (c d)
+        (let ((f2
+          (lambda (e f)
+            (list a b c d e f))))
+          f2))))
+      f1)))
+
+
+(define (closure2 a b)
+  (define (f1 c d)
+    (define (f2 e f)
+      (list a b c d e f))
+    f2)
+  f1)
+
+  
+
+
 (define (fact nn)
   (if (= nn 1) 1 (* nn (fact (- nn 1))  )))
 
@@ -99,13 +123,6 @@
 (define (greater x y) (> x y))
 (define (eq x y) (= x y))
 
-
-(define (a5 x y)
-  (define (f1 i j) (let ((i (+ i j))    (j (* i j))) (plus i j)))
-  (define (f2 i j) (let ((a (+ i j))    (b (* i j))) (plus a b)))
-  (define (f3 i j) (let ((a (+ i j))    (b (* i j))) (* a b)))
-  (define (f4 i j) (let ((a (plus i j)) (b (times i j))) (* a b)))
-  (map (lambda (f) (f x y)) (list f1 f2 f3 f4)))
 
 
 (define (yonjo x)
@@ -221,15 +238,24 @@
         (* x) (* x y) (* x x y) (* x x y y)))
 
 
+(define (a5 x y)
+  (define (f1 i j) (let ((i (+ i j)) (j (* i j))) (plus i j)))
+  (define (f2 i j) (let ((a (+ i j)) (b (* i j))) (times a b)))
+  (define (f3 i j) (let ((a (+ i j)) (b (* i j))) (* a b)))
+  (define (f4 i j) (let ((a (plus i j)) (b (times i j))) (* a b)))
+  (map (lambda (f) (f x y)) (list f1 f2 f3 f4)))
 
-(begin 
-  (display (a1 5))
 
+(begin
+  (display (list (a1 5) (a1 4) (a2 4 5) (a5 10 5)))
   (display (let ((a (+ 10 5)) (b (* 7 8))) (+ a b))  )
   (display ((lambda (a b) (+ a b)) (+ 10 5) (* 7 8))  ) ;この2つは同じ
   (display (a5 5 6))
   (yonjo 3)
   (display (list (varf 'a 'b 'c 'd 'e) (varf2 1 2 3 4) (varf3 'a 'd 'g)))
+  (display c)
+
+  (display (((closure 'a 'b) 'c 'd) 'e ' f))
   ;(display (aaa 7 6)) (display (aaa 6 7))
   
   (testequal)

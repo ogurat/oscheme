@@ -22,17 +22,19 @@ type 'a proctype = 'a env -> 'a valtype
 
 
 let rec analyzeExp  : exp -> 'a proctype = function
-  | SelfEvalExp sexp -> let result = evalSelf sexp in fun _ -> result
+  | SelfEvalExp sexp -> 
+      let result = evalSelf sexp in fun _ -> result
   | UnitExp -> fun _ -> UnitV
   | VarExp x -> fun env -> !(lookup x env)
-  | QuoteExp x -> let result = evalQuote x in fun _ -> result
+  | QuoteExp x ->
+      let result = evalQuote x in fun _ -> result
   | IfExp (c, a, b) ->
       let pred  = analyzeExp c
       and conseq = analyzeExp a
       and alt = analyzeExp b in
       (fun env ->
        (match pred env with
-	| BoolV false -> alt | _ -> conseq) env)
+        | BoolV false -> alt | _ -> conseq) env)
 
   | AndExp ls ->
      let args = List.map analyzeExp ls in
@@ -41,7 +43,7 @@ let rec analyzeExp  : exp -> 'a proctype = function
         | [] -> result
         | p :: rest ->
             (match result with
-	       BoolV false -> result | _ -> loop (p env) rest) in
+               BoolV false -> result | _ -> loop (p env) rest) in
       loop (BoolV true) args
  
   | OrExp ls ->
@@ -51,7 +53,7 @@ let rec analyzeExp  : exp -> 'a proctype = function
           [] -> result
         | p :: rest ->
             (match result with
-	       BoolV false -> loop (p env) rest | e -> e)in
+              BoolV false -> loop (p env) rest | e -> e)in
       loop (BoolV false) args
 
   | LambdaExp (ids, varid, (defs, exp)) ->
@@ -80,7 +82,7 @@ let rec analyzeExp  : exp -> 'a proctype = function
       fun env ->
         let a = extendletrec env pfn in
         (* todo: pid a ではなく lookup id a でいいかもしれない  *)
-	eval_apply (pid a) (List.map (fun p -> p env) arr)
+        eval_apply (pid a) (List.map (fun p -> p env) arr)
 
   | LetrecExp (binds, (defs, exp)) ->
      let e = analyzeExp exp
@@ -91,15 +93,13 @@ let rec analyzeExp  : exp -> 'a proctype = function
        let b = extendletrec a dd in
        e b
 
-  | CondClauseExp x ->
-     analyze_cond x 
+  | CondClauseExp x -> analyze_cond x 
   | SetExp (id, exp) ->
      let e = analyzeExp exp in
      fun env ->
        let a = lookup id env in
        a := (e env); UnitV
-  | BeginExp exps ->
-     analyze_seq exps
+  | BeginExp exps -> analyze_seq exps
   | SeqExp (a, b) ->
      let proc1 = analyzeExp a and proc2 = analyzeExp b in
      fun env -> proc1 env; proc2 env;
@@ -118,16 +118,13 @@ and analyze_cond = function
      and palt = analyzeExp alt in
      fun env ->
        (match pcond env with
-	| BoolV false -> palt env | e -> e)
+        | BoolV false -> palt env | e -> e)
 
 and analyze_seq exps =
-(*
-  let sequentially proc1 proc2 =
-    fun env -> proc1 env; proc2 env in
-*)
-  let sequentially proc1 proc2 env = proc1 env; proc2 env in
+  let sequentially proc1 proc2 env =
+    proc1 env; proc2 env in
   let rec loop proc = (function
-	[] -> proc (* proc自体が proctypeのため,funで包まなくてよい  *)
+        [] -> proc (* proc自体が proctypeのため,funで包まなくてよい *)
       | a :: b -> loop (sequentially proc a) b) in
   let procs = List.map analyzeExp exps in
   (match procs with
@@ -136,7 +133,7 @@ and analyze_seq exps =
 
 and eval_apply proc args =
   (match proc with
-     ProcV (ids, varid, pdefs, pexp, env) -> (* procには定義リストもある  *)
+     ProcV (ids, varid, pdefs, pexp, env) ->
       let newenv =   extend_var env ids varid args in
       let newnewenv = extendletrec newenv pdefs in
       pexp newnewenv
@@ -145,6 +142,9 @@ and eval_apply proc args =
    | _  -> failwith "not proc"
   )
 
+and extendletrec env =
+  Valtype.extendletrec (fun exp -> exp) env
+(*
 and extendletrec env binds  =
   let rec ext = function
       [] -> env
@@ -153,9 +153,9 @@ and extendletrec env binds  =
   let rec loop e = function
       [] -> ()
     | (_, pexp) :: rest  ->
-	let (_, v) :: r = e in
+        let (_, v) :: r = e in
         v := pexp newenv; loop r rest
   in
   loop newenv binds;
   newenv
-
+ *)

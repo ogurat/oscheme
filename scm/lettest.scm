@@ -55,17 +55,11 @@
         '()
         (cons (sq (car x)) (f (cdr x))))))
 
+(define (letlist x y)
+  (let ((a (* x x)) (b (+ y y)) (c 5))
+    (list a b c)))
 
-(define (lettest v)
-  (let ((f (lambda (x) (* x x)))
-        (b 12))
-    (define (q n) (if (= 0 n)
-                      (f v)
-                      (r (- n 1))))
-    (define (r m) (if (= 0 m)
-                      (f v)
-                      (q (- m 1))))
-    (if (< v 5) q r))) 
+
 
 (define (plus x y) (+ x y))
 (define (times x y) (* x y))
@@ -78,28 +72,19 @@
 (define (mapf f)
   (map f '(4 5 18 19 20)))
 
-(define (ff x y)
-  (define (f i j) (let ((i (+ i j)) (j (* i j))) (plus i j)))
-  (define (g i j) (let ((a (+ i j)) (b (* i j))) (times i j)))
-  (define (h i j) (let ((a (+ i j)) (b (* i j))) (times a b)))
-  (define (f2 i j) (let ((i 4) (j 5)) (plus i j)))
-  (map (lambda (f) (f x y)) (list f g h f2)))
 
 (define (fibs)
  (map mapf 
       (list fib fib2 fib3 fib4 (lambda (x) (* x x)))))
-  
 
-(begin 
-  (display (ff 10 5))
+
+(begin
   (display (mapf fourtimes))
   (display (let ((a (times 2 5)) (b (plus 2 5))) (plus a b)))
   (display (let ((a 10) (b 20)) (plus a b)))
   (display (mapsquare '(1 2 3)))
+  (display (letlist 3 4))
   (display (setxy 5 8) )
-  (display (fact2 5))
-  (let ((lt (lettest 5)))
-    (begin
-      (display lt) (display (mapf lt)))))
+  (display (fact2 5)))
 
 (display (fibs))
