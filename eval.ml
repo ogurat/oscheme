@@ -9,7 +9,10 @@ open Valtype
 let rec evalExp env = function
   | SelfEvalExp sexp -> evalSelf sexp
   | UnitExp -> UnitV
-  | VarExp x -> !(lookup x env)
+  | VarExp x ->
+     (match !(lookup x env) with
+        UnboundV -> failwith ("runtime: var " ^ x ^ " Unbound")
+      | x -> x)
   | QuoteExp x -> evalQuote x
   | IfExp (c, a, b) ->
       evalExp env (match evalExp env c with
@@ -57,14 +60,25 @@ let rec evalExp env = function
   | SetExp (id, exp) ->
       let a = lookup id env in
       a := (evalExp env exp); UnitV
+(*
   | BeginExp exps ->
      let rec loop = function
          [] -> UnitV
        | [x] -> evalExp env x
        | x :: rest -> evalExp env x; loop rest in
      loop exps
+ *)
   | SeqExp (a, b) ->
      evalExp env a; evalExp env b
+
+  | DoExp ((vars, inits, steps), test, exp, cmds) ->
+     let rec loop args =
+       let newenv = extend_var env vars Fixed args in
+       (match evalExp newenv test with
+	 BoolV false -> List.map (evalExp newenv) cmds;
+			loop (List.map (evalExp newenv) steps)
+       | _ -> evalExp newenv exp) in
+     loop (List.map (evalExp env) inits)
 
 and eval_cond env = function
     ARROW (cond, ret, alt) ->
@@ -88,6 +102,7 @@ and eval_apply proc args =
 
 and extendletrec env =
   Valtype.extendletrec (fun exp env -> evalExp env exp) env
+
 (*
 and extendletrec env binds : 'a env =
   let rec ext = function

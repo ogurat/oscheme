@@ -50,5 +50,5 @@ let _ =
 
 
 (*
-ocaml -rectypes sparser.cmo parser.cmo lexer.cmo valtype.cmo eval.cmo analyze.cmo scheme.cmo main.cmo
+ocaml -I _build -rectypes sparser.cmo parser.cmo lexer.cmo valtype.cmo eval.cmo analyze.cmo scheme.cmo main.cmo
 *)

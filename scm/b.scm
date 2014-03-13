@@ -8,10 +8,16 @@
 #;(define (equal? x y)
   (= x y))
 
-(define (do1 x)
-  (do ((x x (cdr x))
-       (sum 0 (+ sum (car x))))
-    ((null? x) sum)))
+(define (dotest x x2)
+  (define (f1)
+    (do ((x x (cdr x))
+         (sum 0 (+ sum (car x))))
+      ((null? x) sum)
+      (display x)))
+  (define (f2)
+    (do ((x 0 (+ x 1)) (y x2))
+      ((= x 5) 'a 'b y)))
+  (list (f1) (f2)))
 
 (define varf
   (lambda (a b . c)
@@ -245,12 +251,20 @@
   (define (f4 i j) (let ((a (plus i j)) (b (times i j))) (* a b)))
   (map (lambda (f) (f x y)) (list f1 f2 f3 f4)))
 
+(define (a6)
+  (list
+   (apply plus '(4 9))
+   (apply plus 5 9 '())
+   (apply cons 'a 'b '())
+   (apply cons '(c d))
+   (apply pair? 8 '())))
+
 
 (begin
+  (display (dotest '(1 2 3 4) 'c))
   (display (list (a1 5) (a1 4) (a2 4 5) (a5 10 5)))
   (display (let ((a (+ 10 5)) (b (* 7 8))) (+ a b))  )
   (display ((lambda (a b) (+ a b)) (+ 10 5) (* 7 8))  ) ;この2つは同じ
-  (display (a5 5 6))
   (yonjo 3)
   (display (list (varf 'a 'b 'c 'd 'e) (varf2 1 2 3 4) (varf3 'a 'd 'g)))
   (display c)
@@ -265,10 +279,4 @@
   (display (testand))
   (testdata)
   )
-
-(display (apply plus '(4 9)))
-(display (apply plus 5 9 '()))
-(display (apply cons 'a 'b '()))
-(display (apply cons '(c d)))
-(display (apply pair? 8 '()))
 

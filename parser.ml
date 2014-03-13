@@ -19,10 +19,11 @@ type exp =
   | LetExp    of (id * exp) list * body
   | NamedLetExp of id * (id * exp) list * body
   | LetrecExp of (id * exp) list * body
+  | DoExp of (id list * exp list * exp list) * exp * exp * exp list
 (*  | CONDexp of (exp * exp list) list *)
   | CondClauseExp of condclause
   | SetExp of id * exp
-  | BeginExp of exp list
+(*  | BeginExp of exp list *)
   | SeqExp of exp * exp
 and define = id * exp
 and body = define list * exp
@@ -160,7 +161,7 @@ and parseForm : sexp list -> exp = function
       | _ -> raise (ParseError "set!"))
   | Id "begin" :: rest ->
       body_to_exp (parseExplist rest)
-  | Id "do" :: rest -> parseDo rest
+  | Id "do" :: rest -> parseDo_ rest
   | Id "delay" :: rest ->
       (match rest with 
         [ex] ->  LambdaExp ([], Fixed, ([], parseExp ex))
@@ -227,16 +228,32 @@ and parseDo = function (* todo:外側の変数loopを隠してしまう *)
      let (vars, inits, steps) = splitSpecs specs
      and test, exps = (match test_exps with 
 		| List (test :: exps) -> (parseExp test, parseExplist exps)
-		| _ -> raise (ParseError "????"))
+		| _ -> raise (ParseError "do: test spec"))
      and cmds = parseExplist commands in
 (* (letrec
      ((loop (lambda (vars) (if test (begin exps) (begin commands (loop steps))))))
      (loop inits)
   *)
      let apploop = ApplyExp (VarExp "loop", steps) in
-     let ifbody = IfExp (test, body_to_exp exps, body_to_exp (cmds @ [apploop])) in
-     let loop = LambdaExp (vars, Fixed, ([], ifbody)) in
+     let loopbody = IfExp (test, body_to_exp exps, body_to_exp (cmds @ [apploop])) in
+     let loop = LambdaExp (vars, Fixed, ([], loopbody)) in
      LetrecExp (["loop", loop], ([], ApplyExp (VarExp "loop", inits)))
+ 
+  | _ -> raise (ParseError "do ")
+
+and parseDo_ = function
+  | List specs :: test_exps :: commands -> (* testが成立すると, expsを評価してdoを抜ける *)
+     let specs = splitSpecs specs
+     and test, exps = (match test_exps with 
+		| List (test :: exps) -> (parseExp test, parseExplist exps)
+		| _ -> raise (ParseError "do: test spec"))
+     and cmds = parseExplist commands
+      in
+(* (letrec
+     ((loop (lambda (vars) (if test (begin exps) (begin commands (loop steps))))))
+     (loop inits)
+  *)
+     DoExp (specs, test, body_to_exp exps, cmds)
  
   | _ -> raise (ParseError "do ")
 
@@ -247,8 +264,8 @@ and splitSpecs  : sexp list ->  (id list * exp list * exp list)  = function
       (var :: vars), (parseExp init :: inits), (parseExp step :: steps)
   | List [Id var; init] :: rest -> 
       let (vars, inits, steps) = splitSpecs rest in
-      (var :: vars), (parseExp init :: inits), (UnitExp :: steps)
-  | _ ->raise (ParseError "bindings")
+      (var :: vars), (parseExp init :: inits), (VarExp var :: steps)
+  | _ ->raise (ParseError "do specs")
 
 and parseExplist (l : sexp list) =
   List.map parseExp l

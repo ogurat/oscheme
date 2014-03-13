@@ -25,7 +25,11 @@ let rec analyzeExp  : exp -> 'a proctype = function
   | SelfEvalExp sexp -> 
       let result = evalSelf sexp in fun _ -> result
   | UnitExp -> fun _ -> UnitV
-  | VarExp x -> fun env -> !(lookup x env)
+  | VarExp x ->
+     fun env ->
+     (match !(lookup x env) with
+        UnboundV -> failwith ("runtime: var " ^ x ^ " Unbound")
+      | x -> x)
   | QuoteExp x ->
       let result = evalQuote x in fun _ -> result
   | IfExp (c, a, b) ->
@@ -99,10 +103,27 @@ let rec analyzeExp  : exp -> 'a proctype = function
      fun env ->
        let a = lookup id env in
        a := (e env); UnitV
+(*
   | BeginExp exps -> analyze_seq exps
+ *)
   | SeqExp (a, b) ->
      let proc1 = analyzeExp a and proc2 = analyzeExp b in
      fun env -> proc1 env; proc2 env;
+
+  | DoExp ((vars, inits, steps), test, exp, cmds) ->
+     let inits = List.map analyzeExp inits
+       and steps = List.map analyzeExp steps
+       and test = analyzeExp test
+       and exp = analyzeExp exp
+       and cmds = List.map analyzeExp cmds in
+     fun env ->
+     let rec loop args =
+       let newenv = extend_var env vars Fixed args in
+       (match test newenv with
+	 BoolV false -> List.map (fun p -> p newenv) cmds;
+			loop (List.map (fun p -> p newenv) steps)
+       | _ -> exp newenv) in
+     loop (List.map (fun p -> p env) inits)
 
 and analyze_cond = function
     ARROW (cond, conseq, alt) ->

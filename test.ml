@@ -5,20 +5,16 @@ open Valtype
 open Scheme
 
 
+
 type 'a v = V of 'a valtype | Ex of string
 
-(*
-let a = (SymbolV "a") and b = (SymbolV "b")
-let pairab =  PairV ( a,  b)
- *)
-let proc =  ProcV (["x";"y"], Fixed, [], (fun _ -> UnitV), [])
-let procnn =  ProcV (["nn"], Fixed, [], (fun _ -> UnitV), [])
 
-let bcase = ("../scm/b.scm", [
+let bcase = ("scm/b.scm", [
 
 
 
-("(do1 '(1 2 3 4))", V (IntV 10) );
+("(dotest '(1 2 3 4) 'c)", Ex "'(10 c)") ;
+
 ("(varf 'a 'b 'c 'd 'e)", Ex "'(c d e)" );
 ("(varf2 1 2 3 4)",  V (IntV 10));
 ("(varf3 'a 'd 'g)", Ex "'((a d g) a d g)");
@@ -50,7 +46,7 @@ let bcase = ("../scm/b.scm", [
 
 ])
 
-let lettestcase = ("../scm/lettest.scm", [
+let lettestcase = ("scm/lettest.scm", [
 
 
 ("(fibs)",  Ex "'((3 5 2584 4181 6765) (3 5 2584 4181 6765) (3 5 2584 4181 6765) (3 5 2584 4181 6765) (16 25 324 361 400))");
@@ -61,16 +57,16 @@ let lettestcase = ("../scm/lettest.scm", [
 
 	       ])
 
-let bodycase = ("../scm/body.scm", [
+let bodycase = ("scm/body.scm", [
 
 "(a1 5 4)", V (IntV 20) ;
 "(a3 5 4)", V (IntV 9) ;
-"(a3 4 5)", V (SymbolV "q") ;
+"(a3 4 5)", Ex "'q" ;
 
-"(a4 1 2)", V (SymbolV "c") ;
-"(a4 2 1)", V (SymbolV "y") ;
-"(a4 0 2)", V (SymbolV "g") ;
-"(a4 2 2)", V (SymbolV "h") ;
+"(a4 1 2)", Ex "'c" ;
+"(a4 2 1)", Ex "'y" ;
+"(a4 0 2)", Ex "'g" ;
+"(a4 2 2)", Ex "'h" ;
 
 "(fib 6)",  V (IntV 8) ;
 "(a7 3 4)", V (IntV 12) ;
@@ -78,7 +74,7 @@ let bodycase = ("../scm/body.scm", [
 
 	       ])
 
-let sicp = ("../scm/sicp4.scm", [
+let sicp = ("scm/sicp4.scm", [
   "(replanalyze)", Ex "'()"
 	     ])
 
@@ -155,3 +151,8 @@ let show_exp (file, _) =
 
 let def_exp name =
   List.assoc name
+
+
+(*
+ocaml -I _build -rectypes sparser.cmo parser.cmo lexer.cmo valtype.cmo eval.cmo analyze.cmo scheme.cmo test.cmo
+*)
