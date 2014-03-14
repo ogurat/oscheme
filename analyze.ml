@@ -29,7 +29,8 @@ let rec analyzeExp  : exp -> 'a proctype = function
      fun env ->
      (match !(lookup x env) with
         UnboundV -> failwith ("runtime: var " ^ x ^ " Unbound")
-      | x -> x)
+      | x -> x
+     )
   | QuoteExp x ->
       let result = evalQuote x in fun _ -> result
   | IfExp (c, a, b) ->
@@ -38,8 +39,8 @@ let rec analyzeExp  : exp -> 'a proctype = function
       and alt = analyzeExp b in
       (fun env ->
        (match pred env with
-        | BoolV false -> alt | _ -> conseq) env)
-
+        | BoolV false -> alt | _ -> conseq) env
+      )
   | AndExp ls ->
      let args = List.map analyzeExp ls in
      fun env ->
@@ -47,7 +48,8 @@ let rec analyzeExp  : exp -> 'a proctype = function
         | [] -> result
         | p :: rest ->
             (match result with
-               BoolV false -> result | _ -> loop (p env) rest) in
+               BoolV false -> result | _ -> loop (p env) rest
+            ) in
       loop (BoolV true) args
  
   | OrExp ls ->
@@ -59,15 +61,10 @@ let rec analyzeExp  : exp -> 'a proctype = function
             (match result with
               BoolV false -> loop (p env) rest | e -> e)in
       loop (BoolV false) args
-(*
-  | LambdaExp (ids, varid, (defs, exp)) ->
-     let proc = analyzeExp exp
-     and dd = List.map (fun (id, ex) -> id, analyzeExp ex) defs in
-     fun env -> ProcV (ids, varid, dd, proc, env)
- *)
+
   | LambdaExp (ids, varid, exp) ->
      let proc = analyzeExp exp in
-     fun env -> ProcV (ids, varid, [], proc, env)
+     fun env -> ProcV (ids, varid, proc, env)
 
   | ApplyExp (exp, args) ->
      let proc = analyzeExp exp
@@ -120,9 +117,7 @@ let rec analyzeExp  : exp -> 'a proctype = function
      fun env ->
        let a = lookup id env in
        a := (e env); UnitV
-(*
-  | BeginExp exps -> analyze_seq exps
- *)
+
   | SeqExp (a, b) ->
      let proc1 = analyzeExp a and proc2 = analyzeExp b in
      fun env -> proc1 env; proc2 env;
@@ -137,9 +132,11 @@ let rec analyzeExp  : exp -> 'a proctype = function
      let rec loop args =
        let newenv = extend_var env vars Fixed args in
        (match test newenv with
-	 BoolV false -> List.map (fun p -> p newenv) cmds;
-			loop (List.map (fun p -> p newenv) steps)
-       | _ -> exp newenv) in
+	 BoolV false ->
+           List.map (fun p -> p newenv) cmds;
+           loop (List.map (fun p -> p newenv) steps)
+       | _ -> exp newenv
+       ) in
      loop (List.map (fun p -> p env) inits)
 
 and analyze_cond = function
@@ -150,7 +147,8 @@ and analyze_cond = function
       fun env ->
         (match pcond env with
            BoolV false -> palt env
-         | e -> eval_apply (pcon env) [e])
+         | e -> eval_apply (pcon env) [e]
+        )
   | VAL (cond, alt) ->
      let pcond = analyzeExp cond
      and palt = analyzeExp alt in
@@ -167,14 +165,15 @@ and analyze_seq exps =
   let procs = List.map analyzeExp exps in
   (match procs with
      [] -> failwith "empty seq"
-   | a :: b -> loop a b)
+   | a :: b -> loop a b
+  )
 
 and eval_apply proc args =
   (match proc with
-     ProcV (ids, varid, pdefs, pexp, env) ->
+     ProcV (ids, varid, pexp, env) ->
       let newenv =   extend_var env ids varid args in
-      let newnewenv = extendletrec newenv pdefs in
-      pexp newnewenv
+      (*let newnewenv = extendletrec newenv pdefs in*)
+      pexp newenv
    | PrimV closure ->
       closure args
    | _  -> failwith "not proc"

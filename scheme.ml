@@ -14,7 +14,7 @@ let rec printval = function
 (*  | CharV x -> string_of_char x *)
   | SymbolV x ->  (x)
   | StringV x ->  x (* "\"" ^ x ^ "\"" *)
-  | ProcV (args, _, deflist, _, env) ->
+  | ProcV (args, _, _, env) ->
      let rec pprest = function
 	 [] -> ""
        | a :: b ->  " " ^ a ^ pprest b in

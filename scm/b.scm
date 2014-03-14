@@ -250,7 +250,7 @@
 (define (a1 x)
   (list 
    (list (ev x) (ev2 x) (even? x) (odd? x))
-   (list (fact x) (fact2 x) (fact3 x) (fact4 x))))
+   (list (fact x) (fact2 x) (fact3 x) (fact4 x) (fact5 x))))
 
 (define (a2 x y)
   (list (+ x) (+ x y) (+ x x y) (+ x y 5 8) (+ (+ x y) (* x y))

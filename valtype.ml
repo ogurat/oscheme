@@ -13,7 +13,8 @@ type 'a valtype =
   | CharV of char
   | StringV of string
   | SymbolV of id
-  | ProcV of id list * varid * (id * 'a) list * 'a * 'a env
+(*  | ProcV of id list * varid * (id * 'a) list * 'a * 'a env *)
+  | ProcV of id list * varid * 'a * 'a env
   | PrimV of ('a valtype list -> 'a valtype) 
   | PairV of 'a valtype ref * 'a valtype ref
   | EmptyListV

@@ -12,7 +12,8 @@ let rec evalExp env = function
   | VarExp x ->
      (match !(lookup x env) with
         UnboundV -> failwith ("runtime: var " ^ x ^ " Unbound")
-      | x -> x)
+      | x -> x
+     )
   | QuoteExp x -> evalQuote x
   | IfExp (c, a, b) ->
       evalExp env (match evalExp env c with
@@ -24,7 +25,8 @@ let rec evalExp env = function
         | a :: rest ->
             (match result with
                BoolV false -> BoolV false
-             | _ -> loop (evalExp env a) rest)
+             | _ -> loop (evalExp env a) rest
+            )
       in loop (BoolV true) ls
   | OrExp ls ->
       let rec loop result = function
@@ -32,16 +34,12 @@ let rec evalExp env = function
         | a :: rest ->
             (match result with
                BoolV false -> loop (evalExp env a) rest
-             | e -> e)
+             | e -> e
+            )
       in loop (BoolV false) ls
-(*
-  | LambdaExp (ids, varid, (defs, exp)) ->
-     (* deflistは関数が適用された環境で評価されなければならない *)
-      ProcV (ids, varid, defs, exp, env)
- *)
+
   | LambdaExp (ids, varid, exp) ->
-     (* deflistは関数が適用された環境で評価されなければならない *)
-      ProcV (ids, varid, [], exp, env)
+      ProcV (ids, varid, exp, env)
 
   | ApplyExp (exp, args) ->
       let proc = evalExp env exp
@@ -49,7 +47,7 @@ let rec evalExp env = function
       eval_apply proc a
 (*
   | LetExp (binds, (defs, exp)) ->
-      let a = evalextend (fun e en ->evalExp en e) env binds in
+      let a = evalextend (fun e en -> evalExp en e) env binds in
       let b = extendletrec a defs in
       evalExp b exp
  *)
@@ -88,30 +86,35 @@ let rec evalExp env = function
      let rec loop args =
        let newenv = extend_var env vars Fixed args in
        (match evalExp newenv test with
-	 BoolV false -> List.map (evalExp newenv) cmds;
-			loop (List.map (evalExp newenv) steps)
-       | _ -> evalExp newenv exp) in
+	 BoolV false ->
+           List.map (evalExp newenv) cmds;
+           loop (List.map (evalExp newenv) steps)
+       | _ -> evalExp newenv exp
+       ) in
      loop (List.map (evalExp env) inits)
 
 and eval_cond env = function
     ARROW (cond, ret, alt) ->
      (match evalExp env cond with
         BoolV false -> evalExp env alt
-      | e -> eval_apply (evalExp env ret) [e])
+      | e -> eval_apply (evalExp env ret) [e]
+     )
   | VAL (cond, alt) ->
      (match evalExp env cond with
-      | BoolV false -> evalExp env alt | e -> e)
+      | BoolV false -> evalExp env alt | e -> e
+     )
 
 and eval_apply proc args =
   (match proc with
-    ProcV (ids, varid, defs, exp, env) ->
+    ProcV (ids, varid, exp, env) ->
       let newenv = extend_var env ids varid args in
-      let newnewenv = extendletrec newenv defs in
-      evalExp newnewenv exp
+(*      let newnewenv = extendletrec newenv defs in *)
+      evalExp newenv exp
   | PrimV closure ->
       closure args
   | UnboundV -> failwith "unbound proc!"
-  | _ -> failwith "not proc")
+  | _ -> failwith "not proc"
+  )
 
 and extendletrec env =
   Valtype.extendletrec (fun exp en -> evalExp en exp) env

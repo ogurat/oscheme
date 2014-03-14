@@ -14,21 +14,15 @@ type exp =
   | IfExp of exp * exp * exp
   | AndExp of exp list
   | OrExp of  exp list
-(*  | LambdaExp of id list * varid * body *)
   | LambdaExp of id list * varid * exp
   | ApplyExp of exp * exp list
-(*  | LetExp    of (id * exp) list * body *)
-(*  | NamedLetExp of id * (id * exp) list * body *)
-(*  | LetrecExp of (id * exp) list * body *)
   | LetrecExp of (id * exp) list * exp
   | DoExp of (id list * exp list * exp list) * exp * exp * exp list
-(*  | CONDexp of (exp * exp list) list *)
   | CondClauseExp of condclause
   | SetExp of id * exp
-(*  | BeginExp of exp list *)
   | SeqExp of exp * exp
 and define = id * exp
-and body = define list * exp
+(* and body = define list * exp *)
 and varid = 
    Fixed
  | Vararg of id
@@ -36,7 +30,7 @@ and condclause =
    ARROW of exp * exp * exp
  | VAL of exp * exp
 
-
+type body = define list * exp
 
 
 
@@ -215,16 +209,6 @@ and parseLet_ = function
      parseExp x
   | _ -> raise (ParseError "let")
 
-(*
-and parseLet__ = function
-  | Id var :: List binds :: body ->
-     let a = parseBinding binds and b = parseBody body in
-     NamedLetExp (var, a, b)
-  | List binds :: body ->
-     let a = parseBinding binds and b = parseBody body in
-     LetExp (a, b)
-  | _ -> raise (ParseError "let")
- *)
 
 and parseDo = function (* todo:外側の変数loopを隠してしまう *)
   | List specs :: test_exps :: commands -> (* testが成立すると, expsを評価してdoを抜ける *)
