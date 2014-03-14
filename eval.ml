@@ -34,28 +34,41 @@ let rec evalExp env = function
                BoolV false -> loop (evalExp env a) rest
              | e -> e)
       in loop (BoolV false) ls
-
+(*
   | LambdaExp (ids, varid, (defs, exp)) ->
      (* deflistは関数が適用された環境で評価されなければならない *)
       ProcV (ids, varid, defs, exp, env)
+ *)
+  | LambdaExp (ids, varid, exp) ->
+     (* deflistは関数が適用された環境で評価されなければならない *)
+      ProcV (ids, varid, [], exp, env)
 
   | ApplyExp (exp, args) ->
       let proc = evalExp env exp
       and a = List.map (evalExp env) args in
       eval_apply proc a
+(*
   | LetExp (binds, (defs, exp)) ->
-      let a = evalextend evalExp env binds in
+      let a = evalextend (fun e en ->evalExp en e) env binds in
       let b = extendletrec a defs in
       evalExp b exp
+ *)
+(*
   | NamedLetExp (id, binds, body) ->
       let (ids, args) = List.split binds in
       let fn = LambdaExp (ids, Fixed, body) in
       let a = extendletrec env [id, fn] in
       eval_apply (evalExp a (VarExp id)) (List.map (evalExp env) args)
+ *)
+(*
   | LetrecExp (binds, (defs, exp)) ->
       let a = extendletrec env binds in
       let b = extendletrec a defs in
       evalExp b exp
+ *)
+  | LetrecExp (binds,  exp) ->
+      let a = extendletrec env binds in
+      evalExp a exp
   | CondClauseExp x -> eval_cond env x
   | SetExp (id, exp) ->
       let a = lookup id env in
@@ -101,20 +114,5 @@ and eval_apply proc args =
   | _ -> failwith "not proc")
 
 and extendletrec env =
-  Valtype.extendletrec (fun exp env -> evalExp env exp) env
+  Valtype.extendletrec (fun exp en -> evalExp en exp) env
 
-(*
-and extendletrec env binds : 'a env =
-  let rec ext = function
-      [] -> env
-    | (id, _) :: rest -> (id, ref UnboundV) :: ext rest in
-  let newenv = ext binds in
-  let rec loop e = function
-      [] -> ()
-    | (_, exp) :: rest  ->
-        let (_, v) :: r = e in
-        v := evalExp newenv exp; loop r rest
-  in
-  loop newenv binds;
-  newenv
- *)

@@ -59,11 +59,15 @@ let rec analyzeExp  : exp -> 'a proctype = function
             (match result with
               BoolV false -> loop (p env) rest | e -> e)in
       loop (BoolV false) args
-
+(*
   | LambdaExp (ids, varid, (defs, exp)) ->
      let proc = analyzeExp exp
      and dd = List.map (fun (id, ex) -> id, analyzeExp ex) defs in
      fun env -> ProcV (ids, varid, dd, proc, env)
+ *)
+  | LambdaExp (ids, varid, exp) ->
+     let proc = analyzeExp exp in
+     fun env -> ProcV (ids, varid, [], proc, env)
 
   | ApplyExp (exp, args) ->
      let proc = analyzeExp exp
@@ -73,10 +77,15 @@ let rec analyzeExp  : exp -> 'a proctype = function
        eval_apply (proc env) aa
 (*
   | LetExp (binds, (defs, exp)) ->
-      let a = extendlet env binds in
-      let b = extendletrec a defs in
-      evalExp b exp
+     let bb = List.map (fun (id, ex) -> (id, analyzeExp ex)) binds
+     and dd = List.map (fun (id, ex) -> (id, analyzeExp ex)) defs
+     and exp = analyzeExp exp in
+     fun env ->
+      let a = evalextend (fun e -> e) env bb in
+      let b = extendletrec a dd in
+      exp b
  *)
+(*
   | NamedLetExp (id, binds, body) ->
       let (ids, args) = List.split binds
       and pid = analyzeExp (VarExp id) in
@@ -87,7 +96,8 @@ let rec analyzeExp  : exp -> 'a proctype = function
         let a = extendletrec env pfn in
         (* todo: pid a ではなく lookup id a でいいかもしれない  *)
         eval_apply (pid a) (List.map (fun p -> p env) arr)
-
+ *)
+(*
   | LetrecExp (binds, (defs, exp)) ->
      let e = analyzeExp exp
      and bb = List.map (fun (id, ex) -> (id, analyzeExp ex)) binds 
@@ -96,6 +106,13 @@ let rec analyzeExp  : exp -> 'a proctype = function
        let a = extendletrec env bb in
        let b = extendletrec a dd in
        e b
+ *)
+  | LetrecExp (binds, exp) ->
+     let e = analyzeExp exp
+     and bb = List.map (fun (id, ex) -> (id, analyzeExp ex)) binds in
+     fun env ->
+       let a = extendletrec env bb in
+       e a
 
   | CondClauseExp x -> analyze_cond x 
   | SetExp (id, exp) ->
@@ -165,18 +182,4 @@ and eval_apply proc args =
 
 and extendletrec env =
   Valtype.extendletrec (fun exp -> exp) env
-(*
-and extendletrec env binds  =
-  let rec ext = function
-      [] -> env
-    | (id, _) :: rest -> (id, ref UnboundV) :: ext rest in
-  let newenv = ext binds in
-  let rec loop e = function
-      [] -> ()
-    | (_, pexp) :: rest  ->
-        let (_, v) :: r = e in
-        v := pexp newenv; loop r rest
-  in
-  loop newenv binds;
-  newenv
- *)
+

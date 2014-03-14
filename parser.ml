@@ -14,11 +14,13 @@ type exp =
   | IfExp of exp * exp * exp
   | AndExp of exp list
   | OrExp of  exp list
-  | LambdaExp of id list * varid * body
+(*  | LambdaExp of id list * varid * body *)
+  | LambdaExp of id list * varid * exp
   | ApplyExp of exp * exp list
-  | LetExp    of (id * exp) list * body
-  | NamedLetExp of id * (id * exp) list * body
-  | LetrecExp of (id * exp) list * body
+(*  | LetExp    of (id * exp) list * body *)
+(*  | NamedLetExp of id * (id * exp) list * body *)
+(*  | LetrecExp of (id * exp) list * body *)
+  | LetrecExp of (id * exp) list * exp
   | DoExp of (id list * exp list * exp list) * exp * exp * exp list
 (*  | CONDexp of (exp * exp list) list *)
   | CondClauseExp of condclause
@@ -133,13 +135,13 @@ and parseForm : sexp list -> exp = function
   | Id "lambda" :: rest ->
       (match rest with
         List idlist :: rest ->
-          let ids = parseIdlist idlist and body = parseBody rest in
+          let ids = parseIdlist idlist and body = parseBodyLetrec rest in
           LambdaExp (ids, Fixed, body)
       | Id id :: rest ->
-          let body = parseBody rest in
+          let body = parseBodyLetrec rest in
           LambdaExp ([], Vararg id, body)
       | Cons _ as x :: rest ->
-          let (ids, varid) = parseIdCons x and body = parseBody rest in
+          let (ids, varid) = parseIdCons x and body = parseBodyLetrec rest in
           LambdaExp (ids, varid, body)
       | _ -> raise (ParseError "lambda"))
   | Id "cond" :: rest ->
@@ -153,7 +155,7 @@ and parseForm : sexp list -> exp = function
       (match rest with
         List binds :: b ->
           let a = parseBinding binds in
-          LetrecExp (a, parseBody b)
+          LetrecExp (a, parseBodyLetrec b)
       | _ -> raise (ParseError ""))
   | Id "set!" :: rest ->
       (match rest with 
@@ -164,7 +166,7 @@ and parseForm : sexp list -> exp = function
   | Id "do" :: rest -> parseDo_ rest
   | Id "delay" :: rest ->
       (match rest with 
-        [ex] ->  LambdaExp ([], Fixed, ([], parseExp ex))
+        [ex] ->  LambdaExp ([], Fixed, parseExp ex)
       | _ -> raise (ParseError "delay"))
   | Id "delay_" :: rest -> (* derived s expression  *)
       (match rest with 
@@ -181,17 +183,17 @@ and parseForm : sexp list -> exp = function
 and parseLet = function
   | Id var :: List binds :: body ->
      let (ids, args) = unzipBindings parseExp binds in
-     let fn = LambdaExp (ids, Fixed, parseBody body) in
-     ApplyExp (LetrecExp ([var, fn], ([], VarExp var)), args)
+     let fn = LambdaExp (ids, Fixed, parseBodyLetrec body) in
+     ApplyExp (LetrecExp ([var, fn], VarExp var), args)
 (*
   | Id var :: List binds :: body ->
      let (ids, args) = unzipBindings parseExp binds in
-     let fn = LambdaExp (ids, Fixed, parseBody body) in
+     let fn = LambdaExp' (ids, Fixed, parseBodyLetrec body) in
      LetrecExp ([var, fn], ([], ApplyExp (VarExp var, args)))
  *)
   | List binds :: body ->
      let (ids, args) = unzipBindings parseExp binds in
-     let fn = LambdaExp (ids, Fixed, parseBody body) in
+     let fn = LambdaExp (ids, Fixed, parseBodyLetrec body) in
      ApplyExp (fn, args)
   | _ -> raise (ParseError "let")
 
@@ -213,6 +215,7 @@ and parseLet_ = function
      parseExp x
   | _ -> raise (ParseError "let")
 
+(*
 and parseLet__ = function
   | Id var :: List binds :: body ->
      let a = parseBinding binds and b = parseBody body in
@@ -221,7 +224,7 @@ and parseLet__ = function
      let a = parseBinding binds and b = parseBody body in
      LetExp (a, b)
   | _ -> raise (ParseError "let")
-
+ *)
 
 and parseDo = function (* todo:外側の変数loopを隠してしまう *)
   | List specs :: test_exps :: commands -> (* testが成立すると, expsを評価してdoを抜ける *)
@@ -236,8 +239,8 @@ and parseDo = function (* todo:外側の変数loopを隠してしまう *)
   *)
      let apploop = ApplyExp (VarExp "loop", steps) in
      let loopbody = IfExp (test, body_to_exp exps, body_to_exp (cmds @ [apploop])) in
-     let loop = LambdaExp (vars, Fixed, ([], loopbody)) in
-     LetrecExp (["loop", loop], ([], ApplyExp (VarExp "loop", inits)))
+     let loop = LambdaExp (vars, Fixed, loopbody) in
+     LetrecExp (["loop", loop], ApplyExp (VarExp "loop", inits))
  
   | _ -> raise (ParseError "do ")
 
@@ -312,7 +315,7 @@ and parseClauses = function
       | cond :: body,       _  -> 
           let xy = (parseExp cond, List.map parseExp body) in
           xy :: parseClauses rest
-      | [],                 _  -> failwith "not concidered")
+      | [],                 _  -> failwith "not considered")
   | _ -> raise (ParseError "cond clause")
 
 (*
@@ -324,31 +327,40 @@ and clausestoif clauses =
 
 (* 定義は[本体]の先頭で有効 *)
 and parseDef : sexp list -> define = function
-  (* (define (id rest) l *)
-  | List (Id id :: rest) :: l ->  
-      let ids = parseIdlist rest and body = parseBody l in
-      id, LambdaExp (ids, Fixed, body)
-  | Cons (Id id,x) :: l ->
-      let (ids, varid) = parseIdCons x and body = parseBody l in
-      id, LambdaExp (ids, varid, body)
+  (* (define (var formals) exps *)
+  | List (Id var :: formals) :: exps ->
+      let ids = parseIdlist formals and body = parseBodyLetrec exps in
+      var, LambdaExp (ids, Fixed, body)
+  | Cons (Id var, x) :: exps ->
+      let (ids, varid) = parseIdCons x and body = parseBodyLetrec exps in
+      var, LambdaExp (ids, varid, body)
   (* (define id ex *)
-  | [Id id; ex] ->
-      (* let c = parseExp ex in *)
-      id, parseExp ex
+  | [Id var; ex] ->
+      var, parseExp ex
   | _ -> raise (ParseError " not (define ")
 
 and parseBody : sexp list -> body = function
   | [] -> raise (ParseError " parse body: empty body ")
   | List (Id "define" :: x) :: rest ->
       let def = parseDef x and (defs, e) = parseBody rest in
-      (def :: defs), e
+      def :: defs, e
   | exl -> let a = List.map parseExp exl in
            [], body_to_exp a
 
+and expandBody (defs, exp) : exp =
+  match defs with
+    [] -> exp
+  | x -> let a = List.map (fun (id, x) -> id, x) defs in
+	 LetrecExp (a, exp)
+
+and parseBodyLetrec sexps =
+  expandBody (parseBody sexps)
+
+
 let rec parseDefs = function
   | List (Id "define" :: x) :: rest ->
-      let def = parseDef x and (defs,l) = parseDefs rest in
-      def :: defs, l
+      let (id, exp) = parseDef x and (defs,l) = parseDefs rest in
+      (id, exp) :: defs, l
   | exl -> [], List.map parseExp exl
 
 

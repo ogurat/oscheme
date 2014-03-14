@@ -111,6 +111,19 @@
         (iter (+ i 1) (* i result))))
   (iter 1 1))
 
+(define (fact4 m)
+  (let iter ((i m) (result 1))
+    (if (= i 1)
+        result
+        (iter (- i 1) (* i result)))))
+
+(define (fact5 m)
+  (letrec ((iter (lambda (i result)
+    (if (= i 1)
+        result
+        (iter (- i 1) (* i result))))))
+    (iter m 1)))
+
 
 (define (fib n)
   (if (= n 0)
@@ -237,7 +250,7 @@
 (define (a1 x)
   (list 
    (list (ev x) (ev2 x) (even? x) (odd? x))
-   (list (fact x) (fact2 x) (fact3 x))))
+   (list (fact x) (fact2 x) (fact3 x) (fact4 x))))
 
 (define (a2 x y)
   (list (+ x) (+ x y) (+ x x y) (+ x y 5 8) (+ (+ x y) (* x y))
