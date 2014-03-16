@@ -12,8 +12,7 @@
   (define (f1)
     (do ((x x (cdr x))
          (sum 0 (+ sum (car x))))
-      ((null? x) sum)
-      (display x)))
+      ((null? x) sum)))
   (define (f2)
     (do ((x 0 (+ x 1)) (y x2))
       ((= x 5) 'a 'b y)))
@@ -33,6 +32,42 @@
     (lambda x
       x))
   (cons (f a b c) (g a b c)))
+
+
+(define (quasi x y)
+  (list
+   `(a b ,(+ x y))
+   ` (a b ((q ,(+ x y))))
+   `(unquote x)
+   `x))
+
+(define (quasi2 name)
+   `(list ,name ',name))
+
+(define (quasi3)
+  `(a `(b ,(+ 1 2) ,(foo ,(+ 1 3) d) e) f))
+
+(define (quasi4 name1 name2)
+  `(a `(b ,,name1 ,',name2 d) e))
+
+
+(define (quasi5)
+  `(a ,(+ 1 2) ,@(map abs '(4 5 6)) b))
+
+; error 
+(define (quasi6 x y)
+  `(a ,(+ 1 2) ,@(+ x y) b))
+
+#;(define (quasi7 x y)
+  `,@(list 1 2))
+
+(define (quasi8 x y)
+  `(7 ,@(list x y)))
+
+
+(define (quasibug? x y)
+  (quasiquote (a b ((q unquote (+ x y))))))
+
 
 
 
@@ -158,7 +193,7 @@
                 (if (zeroo? j)
                     (= 1 0)
                     (e? (- j 1))))))
-    (even? n)))
+    (e? n)))
 
 (define (ev2 x)
   (define e? (lambda (n)
@@ -169,7 +204,7 @@
                   (if (zeroo? n)
                       (= 1 0)
                       (e? (- n 1)))))
-  (even? x))
+  (e? x))
 
 (define (aaa x1 x2)
   (define (a) (+ x1 x2))
@@ -271,6 +306,8 @@
    (apply cons 'a 'b '())
    (apply cons '(c d))
    (apply pair? 8 '())))
+
+
 
 
 (begin

@@ -78,6 +78,30 @@
       (list fib fib2 fib3 fib4 (lambda (x) (* x x)))))
 
 
+(define (nest1 x y)
+  (define (inner1 x y) (list ('inner1 x y)))
+  (define (inner2 x y) (list ('inner2 x y)))
+  (letrec
+      ((f1 (lambda (x y)
+             (define (f1inner1 x) 'f1inner1)
+             (define (f1inner2 x) 'f1inner2)
+             (letrec
+                 ((g1 (lambda (a b) (g2 a b)))
+                  (g2 (lambda (a b) (list 'g2 x y a b))))
+               (define (lf1inner1 x) x)
+               (define (lf1inner2 x) x)
+               (g1 x y))))
+       (f2 (lambda (a b)
+             (f1 a b))))
+    (define (linner1 x y)
+      'a)
+    (define (linner2 x y)
+      'b)
+    (f2 x y)))
+
+
+
+
 (begin
   (display (mapf fourtimes))
   (display (let ((a (times 2 5)) (b (plus 2 5))) (plus a b)))

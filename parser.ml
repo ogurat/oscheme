@@ -5,12 +5,17 @@ open Syntax
 
 type id = string;;
 
+type varid =
+   Fixed
+ | Vararg of id
+
 
 type exp =
   | SelfEvalExp of sexp
   | VarExp of id
   | UnitExp
   | QuoteExp of sexp
+  | QuasiQuoteExp of qqexp
   | IfExp of exp * exp * exp
   | AndExp of exp list
   | OrExp of  exp list
@@ -23,12 +28,14 @@ type exp =
   | SeqExp of exp * exp
 and define = id * exp
 (* and body = define list * exp *)
-and varid = 
-   Fixed
- | Vararg of id
 and condclause = 
    ARROW of exp * exp * exp
  | VAL of exp * exp
+and qqexp =
+    S of sexp
+  | Unquote of exp
+  | UnquoteSplice of exp
+  | L of qqexp list
 
 type body = define list * exp
 
@@ -98,7 +105,17 @@ and parseForm : sexp list -> exp = function
   | Id "quote" :: rest ->
       (match rest with
         [a] -> QuoteExp a
-      | _ -> raise (ParseError "quote"))
+      | _ -> raise (ParseError "quote")
+      )
+  | Id "quasiquote" :: rest ->
+      (match rest with
+        [a] ->
+          (match  parseQQ a with
+             UnquoteSplice _ -> raise (ParseError "qq splice")
+           | x -> QuasiQuoteExp (x)
+          )
+      | _ -> raise (ParseError "quasiquote")
+      )
   | Id "if" :: rest ->
      (match rest with
        pred ::conseq :: alt ->
@@ -108,7 +125,8 @@ and parseForm : sexp list -> exp = function
          | _ -> raise (ParseError "if")
          ) in 
          IfExp (parseExp pred, parseExp conseq, altexp)
-     | _ -> raise (ParseError "if") )
+     | _ -> raise (ParseError "if")
+     )
   | Id "and" :: rest ->
       let rec make = function
           [] -> SelfEvalExp (Bool true)
@@ -123,7 +141,8 @@ and parseForm : sexp list -> exp = function
         | x :: rest ->
            (* (if x (and rest) #f) *)
            let a = List ([Id "if"; x; List (Id "and" :: rest); Bool false]) in
-           parseExp a)
+           parseExp a
+     )
   | Id "and__" :: rest -> AndExp (parseExplist rest)
   | Id "or" :: rest -> OrExp (parseExplist rest)
   | Id "lambda" :: rest ->
@@ -137,7 +156,8 @@ and parseForm : sexp list -> exp = function
       | Cons _ as x :: rest ->
           let (ids, varid) = parseIdCons x and body = parseBodyLetrec rest in
           LambdaExp (ids, varid, body)
-      | _ -> raise (ParseError "lambda"))
+      | _ -> raise (ParseError "lambda")
+      )
   | Id "cond" :: rest ->
       parseClauses' rest
   | Id "let"   :: rest -> parseLet rest
@@ -150,24 +170,28 @@ and parseForm : sexp list -> exp = function
         List binds :: b ->
           let a = parseBinding binds in
           LetrecExp (a, parseBodyLetrec b)
-      | _ -> raise (ParseError ""))
+      | _ -> raise (ParseError "")
+      )
   | Id "set!" :: rest ->
       (match rest with 
         [Id id; ex] -> SetExp (id, parseExp ex)
-      | _ -> raise (ParseError "set!"))
+      | _ -> raise (ParseError "set!")
+      )
   | Id "begin" :: rest ->
       body_to_exp (parseExplist rest)
   | Id "do" :: rest -> parseDo_ rest
   | Id "delay" :: rest ->
       (match rest with 
         [ex] ->  LambdaExp ([], Fixed, parseExp ex)
-      | _ -> raise (ParseError "delay"))
+      | _ -> raise (ParseError "delay")
+      )
   | Id "delay_" :: rest -> (* derived s expression  *)
       (match rest with 
         [ex] ->
           (* (lambda () ex) *)
 	  let x = List [Id "lambda"; List []; ex] in parseExp x
-      | _ -> raise (ParseError "delay"))
+      | _ -> raise (ParseError "delay")
+      )
   | op :: rest ->
       let opp = parseExp op and args = parseExplist rest in
       ApplyExp (opp, args)
@@ -279,9 +303,21 @@ and parseClauses' = function
       | cond :: body, _  ->
           let v = body_to_exp (List.map parseExp body) in
           IfExp (parseExp cond, v, parseClauses' rest)
-      | [], _ -> raise (ParseError "cond clause"))
+      | [], _ -> raise (ParseError "cond clause")
+      )
   | _ -> raise (ParseError "cond clause")
 
+and parseQQ : sexp -> qqexp = function
+    Syntax.List [Syntax.Id "unquote"; x] -> Unquote(parseExp x)
+  | Syntax.List [Syntax.Id "unquote-splicing"; x] -> UnquoteSplice(parseExp x)
+(*  | Syntax.List [Syntax.List [Syntax.Id "unquote-splicing"; x]] -> UnquoteSplice(parseExp x) *)
+  | Syntax.List x ->
+      let rec loop = function
+	  [] -> []
+(*	| [Syntax.Id "unquote-splicing"; x] -> [UnquoteSplice(parseExp x)] *)
+	| x :: rest ->  (parseQQ x) :: loop rest
+      in   L (loop x)
+  | x -> (S x)
 
 and parseClauses = function
     [] -> [] (* else節なし  *)
@@ -299,7 +335,8 @@ and parseClauses = function
       | cond :: body,       _  -> 
           let xy = (parseExp cond, List.map parseExp body) in
           xy :: parseClauses rest
-      | [],                 _  -> failwith "not considered")
+      | [],                 _  -> failwith "not considered"
+      )
   | _ -> raise (ParseError "cond clause")
 
 (*
@@ -331,14 +368,11 @@ and parseBody : sexp list -> body = function
   | exl -> let a = List.map parseExp exl in
            [], body_to_exp a
 
-and expandBody (defs, exp) : exp =
+and parseBodyLetrec sexps : exp =
+  let (defs, exp) = parseBody sexps in
   match defs with
     [] -> exp
-  | x -> let a = List.map (fun (id, x) -> id, x) defs in
-	 LetrecExp (a, exp)
-
-and parseBodyLetrec sexps =
-  expandBody (parseBody sexps)
+  | x -> LetrecExp (defs, exp)
 
 
 let rec parseDefs = function

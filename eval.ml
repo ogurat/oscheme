@@ -15,6 +15,31 @@ let rec evalExp env = function
       | x -> x
      )
   | QuoteExp x -> evalQuote x
+  | QuasiQuoteExp x -> 
+     let rec evalQuasi  = function
+         S x -> evalQuote x
+       | Unquote x -> evalExp env x
+       | UnquoteSplice x ->
+          failwith "splice not in list"
+       | L x -> 
+          let rec loop = function
+              [] -> EmptyListV
+            | a :: rest ->
+               (match a with
+                  UnquoteSplice x ->
+                  let a = evalExp env x in
+                  splice rest a
+                | _ -> PairV (ref (evalQuasi a), ref (loop rest))
+               )
+          and splice rest a =
+            (match a with
+              EmptyListV -> loop rest
+            | PairV (a, b) -> (PairV (a, ref (splice rest !b)))
+            | _ -> failwith "splice not list"
+            ) in
+          loop x
+     in evalQuasi x
+
   | IfExp (c, a, b) ->
       evalExp env (match evalExp env c with
           BoolV false -> b | _ -> a)
@@ -86,7 +111,7 @@ let rec evalExp env = function
      let rec loop args =
        let newenv = extend_var env vars Fixed args in
        (match evalExp newenv test with
-	 BoolV false ->
+         BoolV false ->
            List.map (evalExp newenv) cmds;
            loop (List.map (evalExp newenv) steps)
        | _ -> evalExp newenv exp
@@ -115,6 +140,7 @@ and eval_apply proc args =
   | UnboundV -> failwith "unbound proc!"
   | _ -> failwith "not proc"
   )
+
 
 and extendletrec env =
   Valtype.extendletrec (fun exp en -> evalExp en exp) env

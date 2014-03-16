@@ -2,7 +2,7 @@
 open Syntax
 %}
 
-%token LPAREN RPAREN QUOTE DOT
+%token LPAREN RPAREN QUOTE DOT QQUOTE COMMA COMMAAT
 %token EOF
 %token SHARPSEMICOLON
 %token <int> INTV
@@ -37,6 +37,9 @@ Sexp :
   | LPAREN Sexplist RPAREN { List $2 }
   | LPAREN Dotpair RPAREN { $2 }
   | QUOTE Sexp { List [Id "quote"; $2]}
+  | QQUOTE Sexp { List [Id "quasiquote"; $2] }
+  | COMMA Sexp { List [Id "unquote"; $2] }
+  | COMMAAT Sexp { List [Id "unquote-splicing"; $2] }
 Sexplist :
  /* empty */ { [] }
   | Sexp Sexplist { $1 :: $2 }

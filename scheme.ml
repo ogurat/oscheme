@@ -76,21 +76,21 @@ let rec equalp x y =
   | _ ->  false
 
 
-(*
-let add (ls :valtype list) =
+
+let add ls =
   let rec apply = function
     | [IntV i] -> i
     | IntV a :: tl -> a + apply tl 
     | _ -> failwith "Arity mismatch: +"
   in IntV (apply ls);;
 
-let multi (ls :valtype list) = 
+let multi ls = 
   let rec apply = function
     | [IntV i] -> i
     | IntV a :: tl -> a * apply tl 
     | _ -> failwith "Arity mismatch: +"
   in IntV (apply ls)
- *)
+
 let minus ls =
   let rec apply = function
     | [IntV i; IntV j] -> i - j
@@ -311,13 +311,16 @@ in
     | [] -> 0
     | IntV a :: tl -> a + apply tl 
     | _ -> failwith "Arity mismatch: +"
-  in fun args -> IntV (apply args));
+  in add (*(apply args) *) ) ;
   ("*", let rec apply = function
     | [] -> 1
     | IntV a :: tl -> a * apply tl 
     | _ -> failwith "Arity mismatch: +"
   in fun args -> IntV (apply args));
   ("-", minus);
+  ("abs", function
+     [IntV x] -> IntV (abs x)
+   | _ -> failwith "Arity mismatch: abs");
   ("boolean?", function
        [x] -> BoolV (booleanp x)
      | _ -> failwith "Arity mismatch: boolean?");

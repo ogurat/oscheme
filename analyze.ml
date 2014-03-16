@@ -33,6 +33,32 @@ let rec analyzeExp  : exp -> 'a proctype = function
      )
   | QuoteExp x ->
       let result = evalQuote x in fun _ -> result
+  | QuasiQuoteExp x ->
+     let rec evalQuasi env = function
+         S x -> evalQuote x
+       | Unquote x -> analyzeExp x env
+       | UnquoteSplice x ->
+          failwith "splice not in list"
+       | L x -> 
+          let rec loop = function
+              [] -> EmptyListV
+            | a :: rest ->
+               (match a with
+                  UnquoteSplice x ->
+                  let a = analyzeExp x env in
+                  splice rest a
+                | _ -> PairV (ref (evalQuasi env a), ref (loop rest))
+               )
+          and splice rest a =
+            (match a with
+              EmptyListV -> loop rest
+            | PairV (a, b) -> (PairV (a, ref (splice rest !b)))
+            | _ -> failwith "splice not list"
+            ) in
+          loop x
+     in
+     fun env -> evalQuasi env x
+
   | IfExp (c, a, b) ->
       let pred  = analyzeExp c
       and conseq = analyzeExp a
@@ -178,6 +204,7 @@ and eval_apply proc args =
       closure args
    | _  -> failwith "not proc"
   )
+
 
 and extendletrec env =
   Valtype.extendletrec (fun exp -> exp) env

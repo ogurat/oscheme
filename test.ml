@@ -19,6 +19,18 @@ let bcase = ("scm/b.scm", [
 ("(varf2 1 2 3 4)",  V (IntV 10));
 ("(varf3 'a 'd 'g)", Ex "'((a d g) a d g)");
 
+("(quasi 5 6)", Ex "'((a b 11) (a b ((q 11))) 5 x)") ;
+("(quasi2 'a)", Ex "'(list a 'a)") ;
+
+
+("(quasi3)" , Ex "'(a `(b ,(+ 1 2) ,(foo 4 d) e) f)") ;
+("(quasi4 'x 'y)", Ex "'(a `(b ,x ,'y d) e)") ;
+
+("(quasi5)", Ex "'(a 3 4 5 6 b)") ;
+("(quasi6 5 6)", Ex "splice not list") ;
+("(quasi8 1 2)", Ex "'(7 1 2)") ;
+("`,@(list 1 2)", Ex "qq splice") ;
+
 ("c", Ex "'((b (c . d)) (b (c d)) (b (c d)) (b (c d)) (b (c d)) (b c d) (b c d) (b c d) (b c d) (b c d) (b c d) (b c d) (b c d) (b c . d) (b c . d))");
 
 ("(dotp 'a 'b 'c)", Ex "'(c c c a a (a . b) (a . b) (a . b))");
@@ -98,6 +110,13 @@ let  eval s =
   (* let envv = Analyze.extendletrec primis [] in *)
     Analyze.analyzeExp x primis
 
+let  eeval s =
+  let x = parse s 
+    and primis = ge Eval.eval_apply in
+  (* let envv = Analyze.extendletrec primis [] in *)
+    Eval.evalExp primis x
+
+
 
 let withfile proc name =
   let f = open_in name in
@@ -118,16 +137,21 @@ let interpret name =
 
 
 let exec eval env (s, v) =
-try 
-  let vv = eval (parse s) env 
+  try 
+    let vv = eval (parse s) env 
     and ab = (match v with
 		Ex ex -> eval (parse ex) []
 	      | V v -> v) in
-  (try
-       (s, printval vv,  vv = ab)
-    with  Invalid_argument msg -> (s, printval vv, false))
-with Failure msg -> (s, msg, false)
-
+    (try
+	(s, printval vv, vv = ab)
+      with  Invalid_argument msg -> (s, printval vv, false))
+  with 
+    Failure msg ->
+      let (Ex m) = v in
+      (s, msg, msg = m)
+  | Parser.ParseError msg -> 
+     let (Ex m) = v in
+     (s, msg, msg = m)
 
 
 

@@ -22,9 +22,12 @@ rule main = parse
 | ['0'-'9']+
     { Sparser.INTV (int_of_string (Lexing.lexeme lexbuf)) }
 | '\'' { Sparser.QUOTE }
-| "(" { Sparser.LPAREN }
-| ")" { Sparser.RPAREN }
+| '(' { Sparser.LPAREN }
+| ')' { Sparser.RPAREN }
 | '.' { Sparser.DOT }
+| '`' { Sparser.QQUOTE }
+| ",@" { Sparser.COMMAAT }
+| ',' { Sparser.COMMA }
   
 | ['a'-'z' '!' '$' '%'  '&' '*' '/' ':' '<' '=' '>' '?' '^' '_' '~']
    ['a'-'z' '!' '$' '%'  '&' '*' '/' ':' '<' '=' '>' '?' '^' '_' '~' '0'-'9' '+' '-' '.' '@' '\'']*
