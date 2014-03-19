@@ -34,43 +34,6 @@
   (cons (f a b c) (g a b c)))
 
 
-(define (quasi x y)
-  (list
-   `(a b ,(+ x y))
-   ` (a b ((q ,(+ x y))))
-   `(unquote x)
-   `x))
-
-(define (quasi2 name)
-   `(list ,name ',name))
-
-(define (quasi3)
-  `(a `(b ,(+ 1 2) ,(foo ,(+ 1 3) d) e) f))
-
-(define (quasi4 name1 name2)
-  `(a `(b ,,name1 ,',name2 d) e))
-
-
-(define (quasi5)
-  `(a ,(+ 1 2) ,@(map abs '(4 5 6)) b))
-
-; error 
-(define (quasi6 x y)
-  `(a ,(+ 1 2) ,@(+ x y) b))
-
-#;(define (quasi7 x y)
-  `,@(list 1 2))
-
-(define (quasi8 x y)
-  `(7 ,@(list x y)))
-
-
-(define (quasibug? x y)
-  (quasiquote (a b ((q unquote (+ x y))))))
-
-
-
-
 (define c
   '(
     (b (c . d))

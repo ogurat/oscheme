@@ -4,9 +4,12 @@
 open Valtype
 open Scheme
 
+open Parser
 
-
-type 'a v = V of 'a valtype | Ex of string
+type 'a v =
+    V of 'a valtype
+  | Ex of string
+  | Exc of exn
 
 
 let bcase = ("scm/b.scm", [
@@ -19,17 +22,6 @@ let bcase = ("scm/b.scm", [
 ("(varf2 1 2 3 4)",  V (IntV 10));
 ("(varf3 'a 'd 'g)", Ex "'((a d g) a d g)");
 
-("(quasi 5 6)", Ex "'((a b 11) (a b ((q 11))) 5 x)") ;
-("(quasi2 'a)", Ex "'(list a 'a)") ;
-
-
-("(quasi3)" , Ex "'(a `(b ,(+ 1 2) ,(foo 4 d) e) f)") ;
-("(quasi4 'x 'y)", Ex "'(a `(b ,x ,'y d) e)") ;
-
-("(quasi5)", Ex "'(a 3 4 5 6 b)") ;
-("(quasi6 5 6)", Ex "splice not list") ;
-("(quasi8 1 2)", Ex "'(7 1 2)") ;
-("`,@(list 1 2)", Ex "qq splice") ;
 
 ("c", Ex "'((b (c . d)) (b (c d)) (b (c d)) (b (c d)) (b (c d)) (b c d) (b c d) (b c d) (b c d) (b c d) (b c d) (b c d) (b c d) (b c . d) (b c . d))");
 
@@ -90,6 +82,41 @@ let sicp = ("scm/sicp4.scm", [
   "(replanalyze)", Ex "'()"
 	     ])
 
+let qq = ("scm/quasiquote.scm", [
+
+("(qq 5 6)", Ex "'((a b 11) (a b ((q 11))) 5 x)") ;
+
+("(qq2 'a 'b)", Ex "'(list a 'a)") ;
+
+
+("(qq5)", Ex "'(a 3 4 5 6 b)") ;
+("(qq55)", Ex "'((foo 7) . cons)") ;
+("(qq56 1)", Ex "'(foo . 1)") ;
+("(qq6)" , Ex "'(a `(b ,(+ 1 2) ,(foo 4 d) e) f)") ;
+("(qq7 'x 'y)", Ex "'(a `(b ,x ,'y d) e)") ;
+("(qq71)", Ex "'(1 ```,,@,3 4)") ;
+
+("(qq8 5 6)", Exc (Failure "splice not list")) ;
+("(qq10 1)", Ex "'(7 1)") ;
+
+("(qq11 'x)", Ex "'((x b))") ;
+("(qq12 'd)", Ex "'(a b ((c . d)))") ; 
+(*
+("(qq13 'b)", Ex "'(a . b)") ; 
+ *)
+("`,@(list 1 2)", Exc (ParseError "qq splice")) ;
+
+("`(,,(a b))", Exc (ParseError "unquote not in qq")) ;
+
+
+           ])
+
+
+let parse_err_case = [
+  "(letrec)", (ParseError "letrec: empty")
+
+]
+
 
 let sparse s = 
   Sparser.sexpdata Lexer.main (Lexing.from_string s)
@@ -136,22 +163,36 @@ let interpret name =
  *)
 
 
+
+
+let pexec (s, v) =
+  try 
+    let vv = parse s in
+    (s, "ok", true) 
+  with 
+    ex -> 
+     (s, Printexc.to_string ex, ex = v)
+
+let perr cases =
+ List.map pexec cases
+
+let perr () = perr parse_err_case
+
+
 let exec eval env (s, v) =
   try 
     let vv = eval (parse s) env 
     and ab = (match v with
 		Ex ex -> eval (parse ex) []
 	      | V v -> v) in
-    (try
-	(s, printval vv, vv = ab)
-      with  Invalid_argument msg -> (s, printval vv, false))
+    (match vv with
+       ProcV _ -> (s, printval vv, true)
+     | _ -> (s, printval vv, vv = ab)
+    )
   with 
-    Failure msg ->
-      let (Ex m) = v in
-      (s, msg, msg = m)
-  | Parser.ParseError msg -> 
-     let (Ex m) = v in
-     (s, msg, msg = m)
+    ex -> 
+     let (Exc x) = v in
+     (s, Printexc.to_string ex, ex = x)
 
 
 

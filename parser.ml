@@ -110,12 +110,14 @@ and parseForm : sexp list -> exp = function
   | Id "quasiquote" :: rest ->
       (match rest with
         [a] ->
-          (match  parseQQ a with
+          (match parseQQ 0 a with
              UnquoteSplice _ -> raise (ParseError "qq splice")
            | x -> QuasiQuoteExp (x)
           )
       | _ -> raise (ParseError "quasiquote")
       )
+  | Id "unquote" :: _ | Id "unquote-splicing" :: _ ->
+                         raise (ParseError "unquote not in qq")
   | Id "if" :: rest ->
      (match rest with
        pred ::conseq :: alt ->
@@ -170,7 +172,7 @@ and parseForm : sexp list -> exp = function
         List binds :: b ->
           let a = parseBinding binds in
           LetrecExp (a, parseBodyLetrec b)
-      | _ -> raise (ParseError "")
+      | _ -> raise (ParseError "letrec: empty")
       )
   | Id "set!" :: rest ->
       (match rest with 
@@ -307,17 +309,25 @@ and parseClauses' = function
       )
   | _ -> raise (ParseError "cond clause")
 
-and parseQQ : sexp -> qqexp = function
-    Syntax.List [Syntax.Id "unquote"; x] -> Unquote(parseExp x)
-  | Syntax.List [Syntax.Id "unquote-splicing"; x] -> UnquoteSplice(parseExp x)
-(*  | Syntax.List [Syntax.List [Syntax.Id "unquote-splicing"; x]] -> UnquoteSplice(parseExp x) *)
+and parseQQ level : sexp -> qqexp = function
   | Syntax.List x ->
-      let rec loop = function
-	  [] -> []
-(*	| [Syntax.Id "unquote-splicing"; x] -> [UnquoteSplice(parseExp x)] *)
-	| x :: rest ->  (parseQQ x) :: loop rest
-      in   L (loop x)
-  | x -> (S x)
+     (match x with
+        [Syntax.Id "quasiquote"; a] ->
+           L (List.map (parseQQ (level + 1)) x)
+      | [Syntax.Id "unquote"; a] ->
+         if level = 0 then
+           Unquote(parseExp a)
+         else
+           L (List.map (parseQQ (level - 1)) x)
+      | [Syntax.Id "unquote-splicing"; a] ->
+         if level = 0 then
+           UnquoteSplice(parseExp a)
+         else
+           L (List.map (parseQQ (level - 1)) x)
+      | _ -> L (List.map (parseQQ level) x)
+     )
+  | x -> S x
+
 
 and parseClauses = function
     [] -> [] (* else節なし  *)
@@ -358,10 +368,10 @@ and parseDef : sexp list -> define = function
   (* (define id ex *)
   | [Id var; ex] ->
       var, parseExp ex
-  | _ -> raise (ParseError " not (define ")
+  | _ -> raise (ParseError "define: invalid form")
 
 and parseBody : sexp list -> body = function
-  | [] -> raise (ParseError " parse body: empty body ")
+  | [] -> raise (ParseError "parse body: empty body")
   | List (Id "define" :: x) :: rest ->
       let def = parseDef x and (defs, e) = parseBody rest in
       def :: defs, e
