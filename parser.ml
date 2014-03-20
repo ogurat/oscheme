@@ -36,6 +36,8 @@ and qqexp =
   | Unquote of exp
   | UnquoteSplice of exp
   | L of qqexp list
+  | P of qqexp * qqexp
+  | Empty
 
 type body = define list * exp
 
@@ -110,7 +112,7 @@ and parseForm : sexp list -> exp = function
   | Id "quasiquote" :: rest ->
       (match rest with
         [a] ->
-          (match parseQQ 0 a with
+          (match parseQ 0 a with
              UnquoteSplice _ -> raise (ParseError "qq splice")
            | x -> QuasiQuoteExp (x)
           )
@@ -328,6 +330,36 @@ and parseQQ level : sexp -> qqexp = function
      )
   | x -> S x
 
+and parseQ level : sexp -> qqexp = function
+  | Syntax.List x ->
+     let rec loop = function
+        [] -> L []
+      | [Syntax.Id "quasiquote"; a] ->
+         L (List.map (parseQ (level + 1)) x)
+      | [Syntax.Id "unquote"; a] ->
+         if level = 0 then
+           Unquote(parseExp a)
+         else
+           L (List.map (parseQ (level - 1)) x)
+      | Syntax.Id "unquote" :: a ->
+         raise (ParseError "unquote format")
+      | [Syntax.Id "unquote-splicing"; a] ->
+         if level = 0 then
+           UnquoteSplice(parseExp a)
+         else
+           L (List.map (parseQ (level - 1)) x)
+      | Syntax.Id "unquote-splicing" :: a ->
+         raise (ParseError "unquote-splicing format")
+      | x :: rest -> P (parseQ level x, loop rest) in
+     loop x
+  | x -> S x
+ 
+and parseQuasi depth : sexp -> sexp = function
+  | Syntax.List [Syntax.Id "unquote"; form] -> form
+  | Syntax.List [Syntax.List (Syntax.Id "unquote-splicing":: form :: rest)] ->
+     append form (Syntax.List (Syntax.Id "quasiquote" :: rest))
+
+and append a b = a
 
 and parseClauses = function
     [] -> [] (* else節なし  *)

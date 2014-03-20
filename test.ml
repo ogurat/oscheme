@@ -90,20 +90,30 @@ let qq = ("scm/quasiquote.scm", [
 
 
 ("(qq5)", Ex "'(a 3 4 5 6 b)") ;
+("(qq51)", Ex "'(4 5 6)") ;
 ("(qq55)", Ex "'((foo 7) . cons)") ;
-("(qq56 1)", Ex "'(foo . 1)") ;
 ("(qq6)" , Ex "'(a `(b ,(+ 1 2) ,(foo 4 d) e) f)") ;
 ("(qq7 'x 'y)", Ex "'(a `(b ,x ,'y d) e)") ;
 ("(qq71)", Ex "'(1 ```,,@,3 4)") ;
+
+(* ("(qq8 5 6)", Ex "'(a 3 . 11)") ; *)
 
 ("(qq8 5 6)", Exc (Failure "splice not list")) ;
 ("(qq10 1)", Ex "'(7 1)") ;
 
 ("(qq11 'x)", Ex "'((x b))") ;
-("(qq12 'd)", Ex "'(a b ((c . d)))") ; 
-(*
-("(qq13 'b)", Ex "'(a . b)") ; 
- *)
+("(qq12 'd)", Ex "'(a b ((c . d)))") ;
+("(qq12_2)", Ex "'(a b ((c . 3)))") ;
+("(quasiquote (a b ((c unquote x y))))", Exc (ParseError("unquote format"))) ; 
+
+("(qq13 'b)",   Ex "'(foo . b)") ; 
+("(qq13_ 'b)",  Ex "'(foo . b)") ;
+("(qq13__ 'b)", Ex "'(foo . b)") ;
+("(qq13_ '(a b c))",  Ex "'(foo a b c)") ;
+("(qq13__ '(a b c))", Ex "'(foo a b c)") ;
+
+("(quasiquote (a (unquote-splicing x y)))", Exc (ParseError("unquote-splicing format"))) ; 
+
 ("`,@(list 1 2)", Exc (ParseError "qq splice")) ;
 
 ("`(,,(a b))", Exc (ParseError "unquote not in qq")) ;
@@ -189,10 +199,15 @@ let exec eval env (s, v) =
        ProcV _ -> (s, printval vv, true)
      | _ -> (s, printval vv, vv = ab)
     )
-  with 
-    ex -> 
-     let (Exc x) = v in
-     (s, Printexc.to_string ex, ex = x)
+  with
+     Match_failure _ as ex ->
+     (s, Printexc.to_string ex, false)
+   | ex ->
+      (match v with
+         Exc x ->
+         (s, Printexc.to_string ex, ex = x)
+       | _ -> (s, Printexc.to_string ex, false)
+      )
 
 
 
