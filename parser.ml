@@ -35,17 +35,32 @@ and qqexp =
     S of sexp
   | Unquote of exp
   | UnquoteSplice of exp
+(*
   | L of qqexp list
+ *)
   | P of qqexp * qqexp
   | Empty
 
 type body = define list * exp
 
 
+let rec to_string : (sexp list -> string) =
+  function 
+    [] -> ""
+  | [x] -> to_string2 x
+  | x :: rest -> to_string2 x ^ " " ^ to_string rest
+and to_string2 = function
+  | Int x  -> string_of_int x
+  | Id x  -> x
+  | List x  -> "(" ^ to_string x ^ ")"
+  | Cons (x,y) -> "(" ^ to_string2 x ^ " . " ^ to_string2 y ^ ")"
+  | _ -> ""
+
+  
 
 (* 再帰下降パーサ *)
 
-exception ParseError of string
+exception ParseError of string (* todo: s expressionを入れる errorをvariant化する *)
 
 
 let rec to_list a = function
@@ -112,14 +127,14 @@ and parseForm : sexp list -> exp = function
   | Id "quasiquote" :: rest ->
       (match rest with
         [a] ->
-          (match parseQ 0 a with
-             UnquoteSplice _ -> raise (ParseError "qq splice")
+          (match parse_qq 0 a with
+             UnquoteSplice _ -> raise (ParseError ("qq splice: " ^ to_string rest))
            | x -> QuasiQuoteExp (x)
           )
-      | _ -> raise (ParseError "quasiquote")
+      | qq -> raise (ParseError ("quasiquote: " ^ to_string qq))
       )
-  | Id "unquote" :: _ | Id "unquote-splicing" :: _ ->
-                         raise (ParseError "unquote not in qq")
+  | Id "unquote" :: x | Id "unquote-splicing" :: x ->
+           raise (ParseError ("unquote not in qq: " ^ to_string x))
   | Id "if" :: rest ->
      (match rest with
        pred ::conseq :: alt ->
@@ -152,14 +167,13 @@ and parseForm : sexp list -> exp = function
   | Id "lambda" :: rest ->
       (match rest with
         List idlist :: rest ->
-          let ids = parseIdlist idlist and body = parseBodyLetrec rest in
-          LambdaExp (ids, Fixed, body)
+          let ids = parseIdlist idlist in
+          LambdaExp (ids, Fixed, parseBodyLetrec rest)
       | Id id :: rest ->
-          let body = parseBodyLetrec rest in
-          LambdaExp ([], Vararg id, body)
+          LambdaExp ([], Vararg id, parseBodyLetrec rest)
       | Cons _ as x :: rest ->
-          let (ids, varid) = parseIdCons x and body = parseBodyLetrec rest in
-          LambdaExp (ids, varid, body)
+          let (ids, varid) = parseIdCons x in
+          LambdaExp (ids, varid, parseBodyLetrec rest)
       | _ -> raise (ParseError "lambda")
       )
   | Id "cond" :: rest ->
@@ -310,7 +324,7 @@ and parseClauses' = function
       | [], _ -> raise (ParseError "cond clause")
       )
   | _ -> raise (ParseError "cond clause")
-
+(*
 and parseQQ level : sexp -> qqexp = function
   | Syntax.List x ->
      (match x with
@@ -329,38 +343,45 @@ and parseQQ level : sexp -> qqexp = function
       | _ -> L (List.map (parseQQ level) x)
      )
   | x -> S x
-
-and parseQ level : sexp -> qqexp = function
+ *)
+and parse_qq level : sexp -> qqexp = function
   | Syntax.List x ->
-     let rec loop = function
-        [] -> L []
-      | [Syntax.Id "quasiquote"; a] ->
-         L (List.map (parseQ (level + 1)) x)
-      | [Syntax.Id "unquote"; a] ->
+     let rec loop level = function
+         [] -> Empty
+(*
+      | Syntax.Id "quasiquote":: _ ->
+         raise (ParseError "quasiquote format")
+ *)
+      | [Syntax.Id "unquote" as u; a] ->
          if level = 0 then
            Unquote(parseExp a)
          else
-           L (List.map (parseQ (level - 1)) x)
-      | Syntax.Id "unquote" :: a ->
+           P (parse_qq (level - 1) u, P (parse_qq (level - 1) a, Empty))
+      | Syntax.Id "unquote" :: _ ->
          raise (ParseError "unquote format")
-      | [Syntax.Id "unquote-splicing"; a] ->
+      | Syntax.Id "unquote-splicing" :: _ ->
+         raise (ParseError "unquote-splicing format")
+
+      | a :: rest -> P (parse_qq level a, loop level rest) in
+     (match x with
+      | [Syntax.Id "quasiquote" as u; a] ->
+         P (parse_qq (level + 1) u, P (parse_qq (level + 1) a, Empty))
+      | [Syntax.Id "unquote-splicing" as u; a] ->
          if level = 0 then
            UnquoteSplice(parseExp a)
          else
-           L (List.map (parseQ (level - 1)) x)
-      | Syntax.Id "unquote-splicing" :: a ->
-         raise (ParseError "unquote-splicing format")
-      | x :: rest -> P (parseQ level x, loop rest) in
-     loop x
+           P (parse_qq (level - 1) u, P (parse_qq (level - 1) a, Empty))
+      | _ ->
+         loop level x
+     )
   | x -> S x
- 
+
+(*
 and parseQuasi depth : sexp -> sexp = function
   | Syntax.List [Syntax.Id "unquote"; form] -> form
   | Syntax.List [Syntax.List (Syntax.Id "unquote-splicing":: form :: rest)] ->
      append form (Syntax.List (Syntax.Id "quasiquote" :: rest))
-
-and append a b = a
-
+ *)
 and parseClauses = function
     [] -> [] (* else節なし  *)
   | List e :: rest ->

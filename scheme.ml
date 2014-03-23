@@ -24,7 +24,13 @@ let rec printval = function
 	 | x :: rest -> "(" ^  x ^ pprest rest ^ ")")
 	 args)
   | PrimV _ ->  "primitive"
-  | PairV (a, b) ->  "(" ^ printval !a ^ pppair !b ^ ")"
+  | PairV (a, b) ->
+     (match !a with
+     | SymbolV "quasiquote" -> "`" ^ pppair2 !b
+     | SymbolV "unquote" -> "," ^ pppair2 !b
+     | SymbolV "unquote-splicing" -> ",@" ^ pppair2 !b
+     | SymbolV "quote" -> "'" ^ pppair2 !b
+     | _ ->  "(" ^ printval !a ^ pppair !b ^ ")")
   | EmptyListV ->  "()"
   | UnboundV ->  "*unbound*"
   | UnitV -> "#void"
@@ -33,6 +39,10 @@ and pppair = function(* PairVの第2要素 *)
     EmptyListV -> ""
   | PairV (a, b) ->  " " ^ printval !a ^ pppair !b
   | arg -> " . " ^ printval arg
+and pppair2 = function(*  *)
+    EmptyListV -> ""
+  | PairV (a, b) -> printval !a ^ pppair !b
+  | arg -> printval arg
 
 
 
@@ -88,7 +98,7 @@ let multi ls =
   let rec apply = function
     | [IntV i] -> i
     | IntV a :: tl -> a * apply tl 
-    | _ -> failwith "Arity mismatch: +"
+    | _ -> failwith "Arity mismatch: *"
   in IntV (apply ls)
 
 let minus ls =
@@ -307,16 +317,8 @@ and foldr proc init l =
 and makePrimV (id, f) = (id, ref (PrimV f))
 in
    List.map makePrimV [
-  ("+", let rec apply = function
-    | [] -> 0
-    | IntV a :: tl -> a + apply tl 
-    | _ -> failwith "Arity mismatch: +"
-  in add (*(apply args) *) ) ;
-  ("*", let rec apply = function
-    | [] -> 1
-    | IntV a :: tl -> a * apply tl 
-    | _ -> failwith "Arity mismatch: +"
-  in fun args -> IntV (apply args));
+  ("+", add (*(apply args) *) ) ;
+  ("*", multi);
   ("-", minus);
   ("abs", function
      [IntV x] -> IntV (abs x)

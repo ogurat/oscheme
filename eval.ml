@@ -21,6 +21,7 @@ let rec evalExp env = function
        | Unquote x -> evalExp env x
        | UnquoteSplice x ->
           failwith "splice not in list"
+       | Empty -> EmptyListV
        | P (x, y) ->
           let rec splice rest = function
               EmptyListV -> evalQuasi rest
@@ -30,7 +31,7 @@ let rec evalExp env = function
           (match x with
              UnquoteSplice x ->
              (match y with
-                L [] -> evalExp env x
+            (*    L [] -> evalExp env x *)
               | Empty -> evalExp env x
               | _ ->
                  let a = evalExp env x in
@@ -38,6 +39,7 @@ let rec evalExp env = function
              )
            | _ -> PairV (ref (evalQuasi x), ref (evalQuasi y))
           )
+(*
        | L x ->
           let rec loop = function
               [] -> EmptyListV
@@ -54,6 +56,7 @@ let rec evalExp env = function
             | _ -> failwith "splice not list"
              in
           loop x
+ *)
      in evalQuasi x
 
   | IfExp (c, a, b) ->

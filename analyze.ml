@@ -39,7 +39,7 @@ let rec analyzeExp  : exp -> 'a proctype = function
        | Unquote x -> analyzeExp x env
        | UnquoteSplice x ->
           failwith "splice not in list"
-
+       | Empty -> EmptyListV
        | P (x, y) ->
           let rec splice rest = function
               EmptyListV -> evalQuasi env rest
@@ -49,7 +49,7 @@ let rec analyzeExp  : exp -> 'a proctype = function
           (match x with
              UnquoteSplice x ->
              (match y with
-                L [] -> analyzeExp x env
+         (*       L [] -> analyzeExp x env *)
               | Empty -> analyzeExp x env
               | _ ->
                  let a = analyzeExp x env in
@@ -57,7 +57,7 @@ let rec analyzeExp  : exp -> 'a proctype = function
              )
            | _ -> PairV (ref (evalQuasi env x), ref (evalQuasi env y))
           )
- 
+ (*
        | L x -> 
           let rec loop = function
               [] -> EmptyListV
@@ -74,6 +74,7 @@ let rec analyzeExp  : exp -> 'a proctype = function
             | _ -> failwith "splice not list"
             in
           loop x
+  *)
      in
      fun env -> evalQuasi env x
 

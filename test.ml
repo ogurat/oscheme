@@ -5,6 +5,8 @@ open Valtype
 open Scheme
 
 open Parser
+open Syntax
+
 
 type 'a v =
     V of 'a valtype
@@ -86,17 +88,32 @@ let qq = ("scm/quasiquote.scm", [
 
 ("(qq 5 6)", Ex "'((a b 11) (a b ((q 11))) 5 x)") ;
 
-("(qq2 'a 'b)", Ex "'(list a 'a)") ;
+("(qq2 'a)", Ex "'(list a 'a)") ;
 
+("(qq4 '(a s d))", Ex "'(a (b (c (d (s d)))))" ) ;
+("(qq4-2 '(a s d))", Ex "'(a b (c (d (s d))))" ) ; 
+("(qq4-3 '(a s d))", Ex "'(a quasiquote (b (c (d (s d)))))" ) ; 
 
 ("(qq5)", Ex "'(a 3 4 5 6 b)") ;
-("(qq51)", Ex "'(4 5 6)") ;
-("(qq55)", Ex "'((foo 7) . cons)") ;
-("(qq6)" , Ex "'(a `(b ,(+ 1 2) ,(foo 4 d) e) f)") ;
-("(qq7 'x 'y)", Ex "'(a `(b ,x ,'y d) e)") ;
-("(qq71)", Ex "'(1 ```,,@,3 4)") ;
+("(qq5-1)", Ex "'(4 5 6)") ;
+("(qq5-5)", Ex "'((foo 7) . cons)") ;
+("(qq5-7)", Ex "'(foo 7 . cons)") ;
+("(qq5-8)", Ex "'(foo 7 . cons)") ;
 
-(* ("(qq8 5 6)", Ex "'(a 3 . 11)") ; *)
+("(qq6)" , Ex "'(a `(b ,(+ 1 2) ,(foo 4 d) e) f)") ;
+
+("(qq7 'x 'y 'z)", Ex "'(a `(b ,x ,'y d) z e)") ;
+("(qq7-1 'x 'y)", Ex "'(a `(b . ,x) y e)") ;
+("(qq7-2 'x 'y)", Ex "'(a `(b (c . ,x) ,'y d) e)") ;
+("(qq7-3 'x 'y)", Ex "'(a `(b (c . ,(d . x)) ,'y e) f)") ;
+("(qq7-5 'x 'y)", Ex "'(a `(b `(c . ,,x) ,'y d) e)") ;
+("(qq7-5-2 'x 'y)", Ex "'(a `(b `(c ,,x) ,'y d) e)") ;
+("(qq7-6 'x)", Ex "'(a quasiquote (x))") ;
+("(qq7-6 '(x y))", Ex "'(a quasiquote ((x y)))") ;
+("`(a . `(,,'x))", Exc (ParseError("unquote not in qq: (quote x)"))) ;
+("(qq7-8 'x)", Ex "'(a `(b quasiquote (c unquote x)) e)") ;
+("`(a `(b . `(c . ,,,'x)) e)", Exc (ParseError("unquote not in qq: (quote x)"))) ;
+("(qq71)", Ex "'(1 ```,,@,3 4)") ;
 
 ("(qq8 5 6)", Exc (Failure "splice not list")) ;
 ("(qq10 1)", Ex "'(7 1)") ;
@@ -106,19 +123,25 @@ let qq = ("scm/quasiquote.scm", [
 ("(qq12_2)", Ex "'(a b ((c . 3)))") ;
 ("(quasiquote (a b ((c unquote x y))))", Exc (ParseError("unquote format"))) ; 
 
-("(qq13 'b)",   Ex "'(foo . b)") ; 
-("(qq13_ 'b)",  Ex "'(foo . b)") ;
-("(qq13__ 'b)", Ex "'(foo . b)") ;
+("(qq13 'a)",   Ex "'(foo . a)") ;
+("(qq13_ 'a)",  Ex "'(foo . a)") ;
+("(qq13__ 'a)", Ex "'(foo . a)") ;
 ("(qq13_ '(a b c))",  Ex "'(foo a b c)") ;
 ("(qq13__ '(a b c))", Ex "'(foo a b c)") ;
+("(qq14 'a)", Ex "'a") ;
+("(qq14 '(a b c))", Ex "'(a b c)") ;
 
-("(quasiquote (a (unquote-splicing x y)))", Exc (ParseError("unquote-splicing format"))) ; 
+("(quasiquote (foo (unquote-splicing x y)))", Exc (ParseError("unquote-splicing format"))) ; 
 
-("`,@(list 1 2)", Exc (ParseError "qq splice")) ;
+("`,@(list 1 2)", Exc (ParseError("qq splice: (unquote-splicing (list 1 2))")) ) ;
 
-("`(,,(a b))", Exc (ParseError "unquote not in qq")) ;
-
-
+("`(,,(a b))", Exc (ParseError("unquote not in qq: (a b)"))  ) ;
+("`(foo . ,@x)", Exc (ParseError("unquote-splicing format"))  );
+("`(a . ,@'(a b))", Exc (ParseError "unquote-splicing format") ) ;
+("`,(quasiquote 'x 'y)", Exc (ParseError("quasiquote: (quote x) (quote y)"))  ) ;
+("(qq18 'x 'y)", Ex "'(x y)"  ) ;
+("(qq19 'as 'd)", Ex "'(a quasiquote (as d))"  ) ;
+("(qq22 '(a s d))", Ex "'`(a b ,(a s d))") ;
            ])
 
 
@@ -173,7 +196,13 @@ let interpret name =
  *)
 
 
+let show_sexp (file, _) =
+  let es = sexps_from file in
 
+  List.map (function Syntax.List [Syntax.Id "define"; Syntax.List (Syntax.Id id :: formals); body] -> (id, body)) es
+
+let def_sexp id es =
+  Parser.to_string2 (List.assoc id es)
 
 let pexec (s, v) =
   try 
@@ -211,7 +240,7 @@ let exec eval env (s, v) =
 
 
 
-let  atest (file, cases) =
+let atest (file, cases) =
   let primis = ge Analyze.eval_apply
   and (defs, _) = Parser.parseDefs (sexps_from file) in
   let dd = List.map (fun (id, ex) -> (id, Analyze.analyzeExp ex)) defs in
@@ -219,7 +248,7 @@ let  atest (file, cases) =
  List.map (exec Analyze.analyzeExp env) cases
 
 
-let  etest (file, cases) =
+let etest (file, cases) =
   let primis = ge Eval.eval_apply
   and (defs, _) = Parser.parseDefs (sexps_from file) in
   let env = Eval.extendletrec primis defs in
@@ -231,6 +260,7 @@ let show_exp (file, _) =
 
 let def_exp name =
   List.assoc name
+
 
 
 (*
