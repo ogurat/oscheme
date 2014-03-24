@@ -113,7 +113,7 @@ let qq = ("scm/quasiquote.scm", [
 ("`(a . `(,,'x))", Exc (ParseError("unquote not in qq: (quote x)"))) ;
 ("(qq7-8 'x)", Ex "'(a `(b quasiquote (c unquote x)) e)") ;
 ("`(a `(b . `(c . ,,,'x)) e)", Exc (ParseError("unquote not in qq: (quote x)"))) ;
-("(qq71)", Ex "'(1 ```,,@,3 4)") ;
+("(qq7-10)", Ex "'(1 ```,,@,3 4)") ;
 
 ("(qq8 5 6)", Exc (Failure "splice not list")) ;
 ("(qq10 1)", Ex "'(7 1)") ;
@@ -141,6 +141,7 @@ let qq = ("scm/quasiquote.scm", [
 ("`,(quasiquote 'x 'y)", Exc (ParseError("quasiquote: (quote x) (quote y)"))  ) ;
 ("(qq18 'x 'y)", Ex "'(x y)"  ) ;
 ("(qq19 'as 'd)", Ex "'(a quasiquote (as d))"  ) ;
+("(qq20)", Ex "'(`((unquote a b)))") ;
 ("(qq22 '(a s d))", Ex "'`(a b ,(a s d))") ;
            ])
 

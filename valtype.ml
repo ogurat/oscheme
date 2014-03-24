@@ -45,16 +45,19 @@ let rec extend (env: 'a env) ids args  =
     | _, _ -> failwith "parameter unmatch"
  *)
 
+let arg_to_pair l =
+  List.fold_right (fun x y -> PairV(ref x, ref y)) l EmptyListV
+(*
 let rec arg_to_pair = function
     [] -> EmptyListV
   | a :: rest -> PairV (ref a, ref (arg_to_pair rest))
-
+ *)
 (* applyのargsをrefに変換して環境に追加する *)
 let rec extend_var (env : 'a env) ids varid args =
     match (ids, args) with
       [], x ->
         (match varid with
-           Fixed -> env  (* 固定長のときはxにあまりがあってはいけない  *)
+           Fixed -> env  (* todo:固定長のときはxにあまりがあってはいけない  *)
          | Vararg id -> let cc = arg_to_pair x in
 	    (id, ref cc) :: env)
     | id :: b, ex :: d ->
@@ -62,12 +65,15 @@ let rec extend_var (env : 'a env) ids varid args =
     | _, _ -> failwith "parameter unmatch"
 
 
+let rec evalextend eval env (binds: (id * 'a) list) : 'a env =
+  List.fold_right (fun (id, x) y -> (id, ref (eval x env)) :: y) binds env
 
+(*
 let rec evalextend eval env : (id * 'a) list -> 'a env = function (* fold_right *)
     [] -> env
   | (id, x) :: rest ->
        (id, ref (eval x env)) :: evalextend eval env rest
-
+ *)
 
 let extendletrec eval (env : 'a env) binds  =
   let rec ext = function
@@ -93,14 +99,17 @@ let rec evalSelf = function
 
 let rec evalQuote = function
     Syntax.Id s -> SymbolV s
+  | Syntax.Int x -> IntV x
   | Syntax.Bool x -> BoolV x
   | Syntax.Char x -> CharV x
   | Syntax.String x -> StringV x
-  | Syntax.Int x -> IntV x
-  | Syntax.List x -> 
+  | Syntax.List x ->
+      List.fold_right (fun x y -> PairV (ref (evalQuote x), ref y)) x EmptyListV
+(*
       let rec loop = function
         [] -> EmptyListV
       | a :: rest -> PairV (ref (evalQuote a), ref (loop rest)) in
-      loop x
+       loop x
+ *)
   | Syntax.Cons (x, y) ->
      PairV (ref (evalQuote x), ref (evalQuote y))

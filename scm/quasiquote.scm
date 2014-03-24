@@ -85,7 +85,7 @@
   )
 
 
-(define (qq71)
+(define (qq7-10)
   `(1 ```,,@,,@(list (+ 1 2)) 4))
 
 ; error 
@@ -171,7 +171,7 @@
 
 ; http://togetter.com/li/134984
 (define (qq20)
-  `(`(,,@(list 1 2))))
+  `(`(,,@'(a b))))
 
 ; r6rs
 (define (qq21 g)

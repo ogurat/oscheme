@@ -26,12 +26,13 @@ let rec printval = function
   | PrimV _ ->  "primitive"
   | PairV (a, b) ->
      (match !a with
-     | SymbolV "quasiquote" -> "`" ^ pppair2 !b
-     | SymbolV "unquote" -> "," ^ pppair2 !b
-     | SymbolV "unquote-splicing" -> ",@" ^ pppair2 !b
-     | SymbolV "quote" -> "'" ^ pppair2 !b
-     | _ ->  "(" ^ printval !a ^ pppair !b ^ ")")
-  | EmptyListV ->  "()"
+     | SymbolV "quasiquote" -> ppq "`" !a !b
+     | SymbolV "unquote" -> ppq "," !a !b
+     | SymbolV "unquote-splicing" -> ppq ",@" !a !b
+     | SymbolV "quote" -> ppq "'" !a !b
+     | _ ->  "(" ^ printval !a ^ pppair !b ^ ")"
+     )
+  | EmptyListV -> "()"
   | UnboundV ->  "*unbound*"
   | UnitV -> "#void"
 
@@ -39,10 +40,16 @@ and pppair = function(* PairVの第2要素 *)
     EmptyListV -> ""
   | PairV (a, b) ->  " " ^ printval !a ^ pppair !b
   | arg -> " . " ^ printval arg
-and pppair2 = function(*  *)
-    EmptyListV -> ""
-  | PairV (a, b) -> printval !a ^ pppair !b
-  | arg -> printval arg
+and ppq q x = function(*  *)
+  | PairV (a, b) when !b = EmptyListV -> q ^ printval !a
+  | y ->
+     let a = (match y with 
+              | PairV (a, b) ->  " " ^ printval !a ^ pppair !b
+              | EmptyListV -> ""
+              | arg -> " . " ^ printval arg
+             ) in
+     "(" ^ printval x ^ a ^ ")"
+     
 
 
 

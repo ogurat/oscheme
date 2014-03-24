@@ -44,8 +44,7 @@ and qqexp =
 type body = define list * exp
 
 
-let rec to_string : (sexp list -> string) =
-  function 
+let rec to_string : (sexp list -> string) = function 
     [] -> ""
   | [x] -> to_string2 x
   | x :: rest -> to_string2 x ^ " " ^ to_string rest
@@ -53,7 +52,11 @@ and to_string2 = function
   | Int x  -> string_of_int x
   | Id x  -> x
   | List x  -> "(" ^ to_string x ^ ")"
-  | Cons (x,y) -> "(" ^ to_string2 x ^ " . " ^ to_string2 y ^ ")"
+  | Cons (x, y) ->
+     (match y with 
+       Cons _ ->  "(" ^ to_string2 x ^ " " ^ to_string2 y ^ ")"
+     | _ -> "(" ^ to_string2 x ^ " . " ^ to_string2 y ^ ")"
+     )
   | _ -> ""
 
   
