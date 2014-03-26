@@ -36,16 +36,16 @@ let rec printval = function
   | UnboundV ->  "*unbound*"
   | UnitV -> "#void"
 
-and pppair = function(* PairVの第2要素 *)
+and pppair = function (* PairVの第2要素 *)
     EmptyListV -> ""
   | PairV (a, b) ->  " " ^ printval !a ^ pppair !b
   | arg -> " . " ^ printval arg
-and ppq q x = function(*  *)
+and ppq q x = function (* quote *)
   | PairV (a, b) when !b = EmptyListV -> q ^ printval !a
   | y ->
      let a = (match y with 
-              | PairV (a, b) ->  " " ^ printval !a ^ pppair !b
               | EmptyListV -> ""
+              | PairV (a, b) ->  " " ^ printval !a ^ pppair !b
               | arg -> " . " ^ printval arg
              ) in
      "(" ^ printval x ^ a ^ ")"

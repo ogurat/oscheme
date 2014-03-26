@@ -351,29 +351,33 @@ and parse_qq level : sexp -> qqexp = function
   | Syntax.List x ->
      let rec loop level = function
          [] -> Empty
-(*
-      | Syntax.Id "quasiquote":: _ ->
-         raise (ParseError "quasiquote format")
- *)
       | [Syntax.Id "unquote" as u; a] ->
          if level = 0 then
            Unquote(parseExp a)
          else
            P (parse_qq (level - 1) u, P (parse_qq (level - 1) a, Empty))
+      | [Syntax.Id "quasiquote" as u; a] ->
+         P (parse_qq (level + 1) u, P (parse_qq (level + 1) a, Empty))
+
       | Syntax.Id "unquote" :: _ ->
          raise (ParseError "unquote format")
       | Syntax.Id "unquote-splicing" :: _ ->
-         raise (ParseError "unquote-splicing format")
+         raise (ParseError "unquote-splicing: invalid context")
+      | Syntax.Id "quasiquote" :: _ ->
+         raise (ParseError "quasiquote format")
 
       | a :: rest -> P (parse_qq level a, loop level rest) in
      (match x with
+(*
       | [Syntax.Id "quasiquote" as u; a] ->
          P (parse_qq (level + 1) u, P (parse_qq (level + 1) a, Empty))
-      | [Syntax.Id "unquote-splicing" as u; a] ->
+ *)
+      | [Syntax.Id "unquote-splicing" as u; a] -> (* listの中にあるべき *)
          if level = 0 then
            UnquoteSplice(parseExp a)
          else
            P (parse_qq (level - 1) u, P (parse_qq (level - 1) a, Empty))
+ 
       | _ ->
          loop level x
      )

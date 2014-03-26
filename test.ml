@@ -91,8 +91,9 @@ let qq = ("scm/quasiquote.scm", [
 ("(qq2 'a)", Ex "'(list a 'a)") ;
 
 ("(qq4 '(a s d))", Ex "'(a (b (c (d (s d)))))" ) ;
-("(qq4-2 '(a s d))", Ex "'(a b (c (d (s d))))" ) ; 
-("(qq4-3 '(a s d))", Ex "'(a quasiquote (b (c (d (s d)))))" ) ; 
+("(qq4-2 '(a s d))", Ex "'(a b (c (d (s d))))" ) ;
+("(qq4-3 '(a s d))", Ex "'(a quasiquote (b (c (d ,(s d)))))" ) ;
+(* "(qq4-3 '(a s d))", Ex "'(a quasiquote (b (c (d (s d)))))" *)   
 
 ("(qq5)", Ex "'(a 3 4 5 6 b)") ;
 ("(qq5-1)", Ex "'(4 5 6)") ;
@@ -100,26 +101,26 @@ let qq = ("scm/quasiquote.scm", [
 ("(qq5-7)", Ex "'(foo 7 . cons)") ;
 ("(qq5-8)", Ex "'(foo 7 . cons)") ;
 
-("(qq6)" , Ex "'(a `(b ,(+ 1 2) ,(foo 4 d) e) f)") ;
+("(qq6)" , Ex "'(a `(b c ,(+ 1 2) ,(foo 4 d) e) f)") ;
 
-("(qq7 'x 'y 'z)", Ex "'(a `(b ,x ,'y d) z e)") ;
-("(qq7-1 'x 'y)", Ex "'(a `(b . ,x) y e)") ;
-("(qq7-2 'x 'y)", Ex "'(a `(b (c . ,x) ,'y d) e)") ;
-("(qq7-3 'x 'y)", Ex "'(a `(b (c . ,(d . x)) ,'y e) f)") ;
-("(qq7-5 'x 'y)", Ex "'(a `(b `(c . ,,x) ,'y d) e)") ;
-("(qq7-5-2 'x 'y)", Ex "'(a `(b `(c ,,x) ,'y d) e)") ;
-("(qq7-6 'x)", Ex "'(a quasiquote (x))") ;
-("(qq7-6 '(x y))", Ex "'(a quasiquote ((x y)))") ;
-("`(a . `(,,'x))", Exc (ParseError("unquote not in qq: (quote x)"))) ;
-("(qq7-8 'x)", Ex "'(a `(b quasiquote (c unquote x)) e)") ;
-("`(a `(b . `(c . ,,,'x)) e)", Exc (ParseError("unquote not in qq: (quote x)"))) ;
+("(qq7 'x 'y 'z)", Ex "'(a `(b c ,x ,'y d) z e)") ;
+("(qq7-1 'x 'y)", Ex "'(a `(b c . ,x) y e)") ;
+("(qq7-2 'x)", Ex "'(a `(b (c d . ,x)) e)") ;
+("(qq7-3 'x)", Ex "'(a `(b (c d . ,(e . x))) f)") ;
+("(qq7-5 'x)", Ex "'(a `(b `(c d . ,,x)) e)") ;
+("(qq7-5-2 'x)", Ex "'(a `(b `(c d ,,x)) e)") ;
+("(qq7-6 'x)",     Ex "'(a b quasiquote ,x)") ;
+("(qq7-6 '(x y))", Ex "'(a b quasiquote ,(x y))") ;
+
+("(qq7-8 'xy)", Ex "'(a `(b quasiquote (c unquote ,xy)) e)") ;
+("(qq7-9)",  Ex "'(a `(b quasiquote (c . ,,x)) e)") ;
 ("(qq7-10)", Ex "'(1 ```,,@,3 4)") ;
 
 ("(qq8 5 6)", Exc (Failure "splice not list")) ;
 ("(qq10 1)", Ex "'(7 1)") ;
 
 ("(qq11 'x)", Ex "'((x b))") ;
-("(qq12 'd)", Ex "'(a b ((c . d)))") ;
+("(qq12 '(d))", Ex "'(a b ((c d)))") ;
 ("(qq12_2)", Ex "'(a b ((c . 3)))") ;
 ("(quasiquote (a b ((c unquote x y))))", Exc (ParseError("unquote format"))) ; 
 
@@ -131,18 +132,20 @@ let qq = ("scm/quasiquote.scm", [
 ("(qq14 'a)", Ex "'a") ;
 ("(qq14 '(a b c))", Ex "'(a b c)") ;
 
-("(quasiquote (foo (unquote-splicing x y)))", Exc (ParseError("unquote-splicing format"))) ; 
+("(quasiquote (foo (unquote-splicing x y)))", Exc (ParseError("unquote-splicing: invalid context"))) ; 
 
 ("`,@(list 1 2)", Exc (ParseError("qq splice: (unquote-splicing (list 1 2))")) ) ;
 
 ("`(,,(a b))", Exc (ParseError("unquote not in qq: (a b)"))  ) ;
-("`(foo . ,@x)", Exc (ParseError("unquote-splicing format"))  );
-("`(a . ,@'(a b))", Exc (ParseError "unquote-splicing format") ) ;
+("`(foo . ,@x)", Exc (ParseError("unquote-splicing: invalid context"))  );
+("`(a . ,@'(a b))", Exc (ParseError "unquote-splicing: invalid context") ) ;
 ("`,(quasiquote 'x 'y)", Exc (ParseError("quasiquote: (quote x) (quote y)"))  ) ;
 ("(qq18 'x 'y)", Ex "'(x y)"  ) ;
-("(qq19 'as 'd)", Ex "'(a quasiquote (as d))"  ) ;
+("(qq19 'as 'd)", Ex "'(a quasiquote (,as ,d))"  ) ;
 ("(qq20)", Ex "'(`((unquote a b)))") ;
 ("(qq22 '(a s d))", Ex "'`(a b ,(a s d))") ;
+
+
            ])
 
 
@@ -202,9 +205,10 @@ let show_sexp (file, _) =
 
   List.map (function Syntax.List [Syntax.Id "define"; Syntax.List (Syntax.Id id :: formals); body] -> (id, body)) es
 
+(*
 let def_sexp id es =
   Parser.to_string2 (List.assoc id es)
-
+ *)
 let pexec (s, v) =
   try 
     let vv = parse s in

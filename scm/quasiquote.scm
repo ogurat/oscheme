@@ -15,10 +15,10 @@
 (define (qq4-2 x)
   `(a . (b (c (d ,(cdr x))))))
 
-; racket: (a quasiquote (b (c (d ,(cdr x)))))
-; gauche: (qq4-3 '(a s d))  => (a quasiquote (b (c (d (s d)))))
+; racket: (a quasiquote (b (c (d ,(s d)))))
+; gauche: Compile Error: unquote appeared outside quasiquote: ,(cdr x)
 (define (qq4-3 x)
-  `(a . `(b (c (d ,(cdr x))))))
+  `(a . `(b (c (d ,,(cdr x))))))
 
 
 (define (qq5)
@@ -37,50 +37,53 @@
 (define (qq5-8)
   `(foo ,(- 10 3) ,@(car '(cons)))) ; (foo 7 . cons)
 
-
+(define (qq5-9)
+  `(foo asd . 'x))
 
   
 ; nest
 (define (qq6)
-  `(a `(b ,(+ 1 2) ,(foo ,(+ 1 3) d) e) f))
+  `(a `(b c ,(+ 1 2) ,(foo ,(+ 1 3) d) e) f))
 
 (define (qq7 name1 name2 name3)
-  `(a `(b ,,name1 ,',name2 d) ,name3 e))
+  `(a `(b c ,,name1 ,',name2 d) ,name3 e))
 
 (define (qq7-1 name1  name3)
-  `(a `(b . ,,name1 ) ,name3 e))
+  `(a `(b c . ,,name1) ,name3 e))
 
 
-(define (qq7-2 name1 name2)
-  `(a `(b (c . ,,name1) ,',name2 d) e))
-(define (qq7-3 name1 name2)
-  `(a `(b (c . ,(d . ,name1)) ,',name2 e) f))
+(define (qq7-2 name1)
+  `(a `(b (c d . ,,name1)) e))
+(define (qq7-3 name1)
+  `(a `(b (c d . ,(e . ,name1))) f))
 
-(define (qq7-5 name1 name2)
-  `(a `(b `(c . ,,,name1) ,',name2 d) e))
+(define (qq7-5 name1)
+  `(a `(b `(c d . ,,,name1)) e))
 
-(define (qq7-5-2 name1 name2)
-  `(a `(b `(c ,,,name1) ,',name2 d) e))
+(define (qq7-5-2 name1)
+  `(a `(b `(c d ,,,name1)) e))
 
-; racket: (a quasiquote (,name1))
-; gauche: (qq7-6 'x) => (a quasiquote (x))
+; racket: (qq7-6 'x) => (a quasiquote ,x)
+; gauche: Compile Error: unquote appeared outside quasiquote: ,name1
 (define (qq7-6 name1)
-  `(a . `(,name1)))
+  `(a b . `,,name1))
 
-; racket: (a quasiquote (,x))
-; gauche: unquote appeared outside quasiquote: ,'x
-#;(define (qq7-7)
-  `(a . `(,,'x))
+; racket: (a quasiquote ,x)
+; gauche: Compile Error: unquote appeared outside quasiquote: ,x'
+(define (qq7-7)
+  `(a b . `,,'x)
   )
+(define (qq7-7-2)
+  `(a b . ,'x))
 
-; racket: (a `(b quasiquote (c . ,,name1)) e)
-; gauche: (qq7-8 'x) => (a `(b quasiquote (c unquote x)) e)
+; racket: (qq7-8 'x) => (a `(b quasiquote (c . ,,x)) e)
+; gauche: Compile Error: unquote appeared outside quasiquote: ,name1
 (define (qq7-8 name1)
-  `(a `(b . `(c . ,,name1)) e))
+  `(a `(b . `(c . ,,,name1)) e))
 
 ; racket: (a `(b quasiquote (c . ,,x)) e)
-; gauche: unquote appeared outside quasiquote: ,'x
-#;(define (qq7-9)
+; gauche: Compile Error: unquote appeared outside quasiquote: ,'x
+(define (qq7-9)
   `(a `(b . `(c . ,,,'x)) e)
   )
 
@@ -99,7 +102,7 @@
   `(,`(,a b))) ; '((a b))
 
 ; racket: unquote: not in quasiquote in: (unquote (a b))
-; gauche: unquote appeared outside quasiquote: ,(a b)
+; gauche: Compile Error: unquote appeared outside quasiquote: ,(a b)
 #;(define (qq12)
   `(,,(a b))
   )
@@ -133,7 +136,7 @@
   `(,@x))
 
 ; racket: unquote-splicing: invalid context within quasiquote in: unquote-splicing
-; gauche: invalid unquote-splicing form in this context: ,@'x
+; gauche: Compile Error: invalid unquote-splicing form in this context: ,@'x
 #;(define (qq15-0)
   `(foo . ,@'x)
   )
@@ -152,13 +155,13 @@
   )
 
 ; racket: unquote-splicing: invalid context within quasiquote in: unquote-splicing
-; gauche: invalid unquote-splicing form in this context: ,@'(a b)
+; gauche: Compile Error: invalid unquote-splicing form in this context: ,@'(a b)
 #;(define (qq16)
   `(a . ,@'(a b))
   )
 
-; syntax-error: malformed quasiquote: (quasiquote 'x 'y)
-; gauche: : invalid unquote-splicing form in this context: ,@'(a b c)
+; racket: quasiquote: bad syntax in: (quasiquote (quote x) (quote y))
+; gauche: Compile Error: syntax-error: malformed quasiquote: (quasiquote 'x 'y)
 #;(define (qq17)
   `,(quasiquote 'x 'y)
   )
@@ -167,7 +170,7 @@
   `,`(,x ,y))
 
 (define (qq19 x y)
-  `(a . `(,x ,y)))
+  `(a . `(,,x ,,y)))
 
 ; http://togetter.com/li/134984
 (define (qq20)
@@ -179,3 +182,6 @@
 
 (define (qq22 x)
   ``(a b ,,x))
+
+(define (qq23 x)
+  '(`,@x))
