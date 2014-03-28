@@ -19,7 +19,7 @@ rule main = parse
 
 | '"' [^ '"']* '"' { Sparser.STRINGV (Lexing.lexeme lexbuf) }
 
-| ['0'-'9']+
+| '-'? ['0'-'9']+
     { Sparser.INTV (int_of_string (Lexing.lexeme lexbuf)) }
 | '\'' { Sparser.QUOTE }
 | '(' { Sparser.LPAREN }
@@ -31,8 +31,7 @@ rule main = parse
   
 | ['a'-'z' '!' '$' '%'  '&' '*' '/' ':' '<' '=' '>' '?' '^' '_' '~']
    ['a'-'z' '!' '$' '%'  '&' '*' '/' ':' '<' '=' '>' '?' '^' '_' '~' '0'-'9' '+' '-' '.' '@' '\'']*
-| '+'
-| '-'
+| '+' | '-'
 | "..."
     { let id = Lexing.lexeme lexbuf in
       Sparser.ID id

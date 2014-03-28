@@ -72,7 +72,7 @@ let eqp x y =
   match (x, y) with
   | (BoolV true, BoolV true) 
   | (BoolV false, BoolV false) ->  true
-  | (SymbolV s, SymbolV s2) -> s = s2
+  | (SymbolV s1, SymbolV s2) -> s1 = s2
   | (EmptyListV, EmptyListV) ->  true
   | StringV a, StringV b -> a == b
 (*  | VectorV a, VectorV b -> a == b *)
@@ -307,7 +307,7 @@ and foldl proc init l =
   let rec impl accum = function
     | EmptyListV -> accum
     | PairV(x, rest) ->
-        impl (eval_apply proc [!x;accum]) !rest
+        impl (eval_apply proc [!x; accum]) !rest
     | _ -> failwith "not pair: foldl"
   in impl init l
 
@@ -315,10 +315,9 @@ and foldr proc init l =
   let rec impl = function
     | EmptyListV -> init
     | PairV(x, rest) ->
-        let a = impl !rest in
-        eval_apply proc [!x;a]
+        eval_apply proc [!x; impl !rest]
     | _ -> failwith "not pair: foldr"
-  in impl  l
+  in impl l
 
 
 and makePrimV (id, f) = (id, ref (PrimV f))

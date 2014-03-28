@@ -34,7 +34,8 @@ let rec analyzeExp  : exp -> 'a proctype = function
   | QuoteExp x ->
       let result = evalQuote x in fun _ -> result
   | QuasiQuoteExp x ->
-     let rec evalQuasi env = function
+     let rec evalQuasi v env =
+       (match v with
          S x -> evalQuote x
        | Unquote x -> analyzeExp x env
        | UnquoteSplice x ->
@@ -42,20 +43,17 @@ let rec analyzeExp  : exp -> 'a proctype = function
        | Empty -> EmptyListV
        | P (x, y) ->
           let rec splice rest = function
-              EmptyListV -> evalQuasi env rest
+              EmptyListV -> evalQuasi rest env
             | PairV (a, b) -> (PairV (a, ref (splice rest !b)))
             | x -> failwith "splice not list"
              in
           (match x with
              UnquoteSplice x ->
              (match y with
-         (*       L [] -> analyzeExp x env *)
               | Empty -> analyzeExp x env
-              | _ ->
-                 let a = analyzeExp x env in
-                 splice y a
+              | _ -> splice y (analyzeExp x env)
              )
-           | _ -> PairV (ref (evalQuasi env x), ref (evalQuasi env y))
+           | _ -> PairV (ref (evalQuasi x env), ref (evalQuasi y env))
           )
  (*
        | L x -> 
@@ -75,8 +73,8 @@ let rec analyzeExp  : exp -> 'a proctype = function
             in
           loop x
   *)
-     in
-     fun env -> evalQuasi env x
+       ) in
+     fun env -> evalQuasi x env
 
   | IfExp (c, a, b) ->
       let pred  = analyzeExp c
@@ -111,12 +109,28 @@ let rec analyzeExp  : exp -> 'a proctype = function
      let proc = analyzeExp exp in
      fun env -> ProcV (ids, varid, proc, env)
 
+  | MacroExp (ids, vararg, exp) ->
+     let proc = analyzeExp exp in
+     fun env -> MacroV (ids, vararg, proc, env)
+
   | ApplyExp (exp, args) ->
      let proc = analyzeExp exp
      and a = List.map analyzeExp args in
      fun env ->
        let aa = List.map (fun p -> p env) a in 
        eval_apply (proc env) aa
+  | MacroAppExp (id, sexps) ->
+     let args = List.map evalQuote sexps in
+     fun env ->
+     (match !(lookup id env) with
+      | MacroV (ids, varid, exp, en) ->
+         let newenv = extend_var en ids varid args in
+         let v = exp newenv in
+         let s = val_to_sexp v in
+         let proc = analyzeExp (parseExp s) in
+         proc env
+      | _ -> failwith "not macro"
+     )
 (*
   | LetExp (binds, (defs, exp)) ->
      let bb = List.map (fun (id, ex) -> (id, analyzeExp ex)) binds
@@ -156,7 +170,7 @@ let rec analyzeExp  : exp -> 'a proctype = function
        let a = extendletrec env bb in
        e a
 
-  | CondClauseExp x -> analyze_cond x 
+  | CondClauseExp x -> analyze_cond x
   | SetExp (id, exp) ->
      let e = analyzeExp exp in
      fun env ->
@@ -201,6 +215,7 @@ and analyze_cond = function
        (match pcond env with
         | BoolV false -> palt env | e -> e)
 
+(* unused  *)
 and analyze_seq exps =
   let sequentially proc1 proc2 env =
     proc1 env; proc2 env in

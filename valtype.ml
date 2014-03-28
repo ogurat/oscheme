@@ -13,8 +13,8 @@ type 'a valtype =
   | CharV of char
   | StringV of string
   | SymbolV of id
-(*  | ProcV of id list * varid * (id * 'a) list * 'a * 'a env *)
-  | ProcV of id list * varid * 'a * 'a env
+  | ProcV  of id list * varid * 'a * 'a env
+  | MacroV of id list * varid * 'a * 'a env
   | PrimV of ('a valtype list -> 'a valtype) 
   | PairV of 'a valtype ref * 'a valtype ref
   | EmptyListV
@@ -113,3 +113,17 @@ let rec evalQuote = function
  *)
   | Syntax.Cons (x, y) ->
      PairV (ref (evalQuote x), ref (evalQuote y))
+
+let rec val_to_sexp = function
+  IntV x -> Syntax.Int x
+  | BoolV x -> Syntax.Bool x
+  | CharV x -> Syntax.Char x
+  | StringV x -> Syntax.String x
+  | EmptyListV -> Syntax.List []
+  | SymbolV x -> Syntax.Id x
+  | PairV (x, y) ->
+     (match val_to_sexp !y with
+        Syntax.List a -> Syntax.List (val_to_sexp !x :: a)
+      | a -> Syntax.Cons (val_to_sexp !x, a)
+     )
+  | x -> failwith "can not match sexp" 

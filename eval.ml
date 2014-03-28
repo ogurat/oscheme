@@ -31,11 +31,8 @@ let rec evalExp env = function
           (match x with
              UnquoteSplice x ->
              (match y with
-            (*    L [] -> evalExp env x *)
               | Empty -> evalExp env x
-              | _ ->
-                 let a = evalExp env x in
-                 splice y a
+              | _ -> splice y (evalExp env x)
              )
            | _ -> PairV (ref (evalQuasi x), ref (evalQuasi y))
           )
@@ -46,8 +43,7 @@ let rec evalExp env = function
             | a :: rest ->
                (match a with
                   UnquoteSplice x ->
-                  let a = evalExp env x in
-                  splice rest a
+                  splice rest (evalExp env x)
                 | _ -> PairV (ref (evalQuasi a), ref (loop rest))
                )
           and splice rest = function
@@ -84,11 +80,21 @@ let rec evalExp env = function
 
   | LambdaExp (ids, varid, exp) ->
       ProcV (ids, varid, exp, env)
-
+  | MacroExp (ids, vararg, exp) ->
+      MacroV (ids, vararg, exp, env)
   | ApplyExp (exp, args) ->
       let proc = evalExp env exp
       and a = List.map (evalExp env) args in
       eval_apply proc a
+  | MacroAppExp (id, sexps) ->
+     let args = List.map evalQuote sexps in
+     (match !(lookup id env) with
+      | MacroV (ids, varid, exp, en) ->
+         let newenv = extend_var en ids varid args in
+         let v = evalExp newenv exp in
+         evalExp env (parseExp (val_to_sexp v))
+      | _ -> failwith "not macro"
+     )
 (*
   | LetExp (binds, (defs, exp)) ->
       let a = evalextend (fun e en -> evalExp en e) env binds in
@@ -151,11 +157,12 @@ and eval_cond env = function
 and eval_apply proc args =
   (match proc with
     ProcV (ids, varid, exp, env) ->
-      let newenv = extend_var env ids varid args in
-(*      let newnewenv = extendletrec newenv defs in *)
-      evalExp newenv exp
+     let newenv = extend_var env ids varid args in
+     evalExp newenv exp
+
+
   | PrimV closure ->
-      closure args
+     closure args
   | UnboundV -> failwith "unbound proc!"
   | _ -> failwith "not proc"
   )

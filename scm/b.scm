@@ -245,6 +245,7 @@
   ))
 
 
+
 (define (a1 x)
   (list 
    (list (ev x) (ev2 x) (even? x) (odd? x))
@@ -271,6 +272,22 @@
    (apply pair? 8 '())))
 
 
+(define (>= x y)
+  (not (< x y)))
+
+(define (a7 x)
+  (let loop((numbers x)
+            (nonneg '())
+            (neg '()))
+    (cond ((null? numbers) (list nonneg neg))
+          ((>= (car numbers) 0)
+           (loop (cdr numbers)
+                 (cons (car numbers) nonneg)
+                 neg))
+          ((< (car numbers) 0)
+           (loop (cdr numbers)
+                 nonneg
+                 (cons (car numbers) neg))))))
 
 
 (begin

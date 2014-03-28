@@ -41,6 +41,8 @@ let bcase = ("scm/b.scm", [
 ("(a2 4 5)", Ex "'(4 9 13 22 29 4 20 80 400)");
 ("(a5 10 5)", Ex "'(65 750 750 750)");
 
+("(a7 '(3 -2 1 6 -5))", Ex "'((6 1 3) (-5 -2))" ) ;
+
 ("(testand)", Ex "'((1 2 #t #f) (1 1 5 7 #t))");
 
 
@@ -147,6 +149,19 @@ let qq = ("scm/quasiquote.scm", [
 
 
            ])
+
+let macro = ("scm/mlib.scm", [
+
+"(aa 2 5)", Ex "'10" ;
+
+"(dotest '(1 2 3 4) 'c)", Ex "'(10 c)" ;
+
+("(condtest 1 'b)", Ex "'(first (b 2) else4)");
+("(condtest 2 'c)", Ex "'(second else3 else4)");
+("(condtest 3 'b)", Ex "'(else (b 2) else4)");
+
+	       ])
+
 
 
 let parse_err_case = [

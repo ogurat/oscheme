@@ -21,11 +21,13 @@ type exp =
   | OrExp of  exp list
   | LambdaExp of id list * varid * exp
   | ApplyExp of exp * exp list
+  | MacroAppExp of id * sexp list
   | LetrecExp of (id * exp) list * exp
   | DoExp of (id list * exp list * exp list) * exp * exp * exp list
   | CondClauseExp of condclause
   | SetExp of id * exp
   | SeqExp of exp * exp
+  | MacroExp of id list * varid * exp
 and define = id * exp
 (* and body = define list * exp *)
 and condclause = 
@@ -114,12 +116,11 @@ let rec parseExp : sexp -> exp = function
   | Int _ | Bool _ | Char _ | String _ as a -> SelfEvalExp a
   | Id x  -> VarExp x
   | List x -> parseForm x
-  | Cons _ -> raise (ParseError "dot pair") 
+
    (* sparserが できる限りListにしているのに依存 *)
-(*
   | Cons (x, y) ->
        parseForm (to_list x y)
- *)
+
 
 and parseForm : sexp list -> exp = function
   | Id "quote" :: rest ->
@@ -214,8 +215,14 @@ and parseForm : sexp list -> exp = function
       | _ -> raise (ParseError "delay")
       )
   | op :: rest ->
-      let opp = parseExp op and args = parseExplist rest in
-      ApplyExp (opp, args)
+     (match op with
+     | Id "aand" | Id "and2" | Id "oor" | Id "ccond" | Id "ddo" | Id "bbegin" ->
+        let (Id var) = op in
+        (* let a = List.map (fun e -> QuoteExp e) rest in *)
+        MacroAppExp (var, rest)
+     | _ -> let opp = parseExp op and args = parseExplist rest in
+            ApplyExp (opp, args)
+     )
   | [] -> raise (ParseError "empty form")
 
 
@@ -256,7 +263,8 @@ and parseLet_ = function
 
 
 and parseDo = function (* todo:外側の変数loopを隠してしまう *)
-  | List specs :: test_exps :: commands -> (* testが成立すると, expsを評価してdoを抜ける *)
+(* testが成立すると, expsを評価してdoを抜ける *)
+  | List specs :: test_exps :: commands -> 
      let (vars, inits, steps) = splitSpecs specs
      and test, exps = (match test_exps with 
 		| List (test :: exps) -> (parseExp test, parseExplist exps)
@@ -267,14 +275,16 @@ and parseDo = function (* todo:外側の変数loopを隠してしまう *)
      (loop inits)
   *)
      let apploop = ApplyExp (VarExp "loop", steps) in
-     let loopbody = IfExp (test, body_to_exp exps, body_to_exp (cmds @ [apploop])) in
+     let next = body_to_exp (cmds @ [apploop]) in
+     let loopbody = IfExp (test, body_to_exp exps, next) in
      let loop = LambdaExp (vars, Fixed, loopbody) in
      LetrecExp (["loop", loop], ApplyExp (VarExp "loop", inits))
  
   | _ -> raise (ParseError "do ")
 
 and parseDo_ = function
-  | List specs :: test_exps :: commands -> (* testが成立すると, expsを評価してdoを抜ける *)
+(* testが成立すると, expsを評価してdoを抜ける *)
+  | List specs :: test_exps :: commands ->
      let specs = splitSpecs specs
      and test, exps = (match test_exps with 
 		| List (test :: exps) -> (parseExp test, parseExplist exps)
@@ -430,10 +440,28 @@ and parseDef : sexp list -> define = function
       var, parseExp ex
   | _ -> raise (ParseError "define: invalid form")
 
+and parseDefMacro : sexp list -> define = function
+  (* (define (var formals) exp *)
+  | [List (Id var :: formals); exp] ->
+      let ids = parseIdlist formals in
+      var, MacroExp (ids, Fixed, parseExp exp)
+  | [Id var; List [Id "lambda"; List formals; exp]] ->
+      let ids = parseIdlist formals in
+      var, MacroExp (ids, Fixed, parseExp exp)
+  | [Id var; List [Id "lambda";  a; exp]] ->
+      let (ids, varid) = parseIdCons a in
+      var, MacroExp (ids, varid, parseExp exp)
+  | [Id var ; List [Id "lambda"; Id formal; exp]] ->
+      var, MacroExp ([], Vararg formal, parseExp exp)
+  | _ -> raise (ParseError "define macro: invalid form")
+
 and parseBody : sexp list -> body = function
   | [] -> raise (ParseError "parse body: empty body")
   | List (Id "define" :: x) :: rest ->
       let def = parseDef x and (defs, e) = parseBody rest in
+      def :: defs, e
+  | List (Id "define-macro" :: x) :: rest ->
+      let def = parseDefMacro x and (defs, e) = parseBody rest in
       def :: defs, e
   | exl -> let a = List.map parseExp exl in
            [], body_to_exp a
@@ -448,6 +476,9 @@ and parseBodyLetrec sexps : exp =
 let rec parseDefs = function
   | List (Id "define" :: x) :: rest ->
       let (id, exp) = parseDef x and (defs,l) = parseDefs rest in
+      (id, exp) :: defs, l
+  | List (Id "define-macro" :: x) :: rest ->
+      let (id, exp) = parseDefMacro x and (defs,l) = parseDefs rest in
       (id, exp) :: defs, l
   | exl -> [], List.map parseExp exl
 
