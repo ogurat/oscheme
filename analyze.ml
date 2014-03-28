@@ -40,7 +40,7 @@ let rec analyzeExp  : exp -> 'a proctype = function
        | Unquote x -> analyzeExp x env
        | UnquoteSplice x ->
           failwith "splice not in list"
-       | Empty -> EmptyListV
+       | Nil -> EmptyListV
        | P (x, y) ->
           let rec splice rest = function
               EmptyListV -> evalQuasi rest env
@@ -50,7 +50,7 @@ let rec analyzeExp  : exp -> 'a proctype = function
           (match x with
              UnquoteSplice x ->
              (match y with
-              | Empty -> analyzeExp x env
+              | Nil -> analyzeExp x env
               | _ -> splice y (analyzeExp x env)
              )
            | _ -> PairV (ref (evalQuasi x env), ref (evalQuasi y env))

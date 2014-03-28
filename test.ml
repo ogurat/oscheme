@@ -164,6 +164,7 @@ let macro = ("scm/mlib.scm", [
 
 
 
+
 let parse_err_case = [
   "(letrec)", (ParseError "letrec: empty")
 
@@ -217,8 +218,7 @@ let interpret name =
 
 let show_sexp (file, _) =
   let es = sexps_from file in
-
-  List.map (function Syntax.List [Syntax.Id "define"; Syntax.List (Syntax.Id id :: formals); body] -> (id, body)) es
+  List.map (function List [Id "define"; List (Id id :: formals); body] -> (id, body)) es
 
 (*
 let def_sexp id es =
@@ -238,25 +238,38 @@ let perr cases =
 let perr () = perr parse_err_case
 
 
-let exec eval env (s, v) =
+let exec eval env (s, v) = (* v:期待結果 *)
   try 
     let vv = eval (parse s) env 
     and ab = (match v with
 		Ex ex -> eval (parse ex) []
-	      | V v -> v) in
+	      | V v -> v
+             ) in
     (match vv with
-       ProcV _ -> (s, printval vv, true)
+       ProcV _ -> (s, printval vv, true) (* abがProcであるかcheckすべし *)
      | _ -> (s, printval vv, vv = ab)
     )
   with
      Match_failure _ as ex ->
-     (s, Printexc.to_string ex, false)
+       (s, Printexc.to_string ex, false)
    | ex ->
       (match v with
-         Exc x ->
-         (s, Printexc.to_string ex, ex = x)
+         Exc x -> (s, Printexc.to_string ex, ex = x)
        | _ -> (s, Printexc.to_string ex, false)
       )
+
+
+let exec_expand eval env (var,s) =
+
+    let o = (Expand.expandExp env s) in
+    (var, o)
+(*
+  with
+     Match_failure _ as ex ->
+       Printexc.to_string ex
+   | ex ->
+        Printexc.to_string ex
+ *)
 
 
 
@@ -282,7 +295,15 @@ let def_exp name =
   List.assoc name
 
 
+let expand (file, _) =
+  let primis = ge Eval.eval_apply
+  and (defs, _) = Parser.parseDefs (sexps_from file) in
+  let env = Eval.extendletrec primis defs in
+ List.map (exec_expand (fun exp en-> Eval.evalExp en exp) env) defs
+
+
+
 
 (*
-ocaml -I _build -rectypes sparser.cmo parser.cmo lexer.cmo valtype.cmo eval.cmo analyze.cmo scheme.cmo test.cmo
+ocaml -I _build -rectypes sparser.cmo parser.cmo lexer.cmo valtype.cmo eval.cmo analyze.cmo scheme.cmo expand.cmo test.cmo
 *)

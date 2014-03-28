@@ -34,30 +34,30 @@ and condclause =
    ARROW of exp * exp * exp
  | VAL of exp * exp
 and qqexp =
-    S of sexp
+    S of sexp (* s expression *)
   | Unquote of exp
   | UnquoteSplice of exp
 (*
   | L of qqexp list
  *)
-  | P of qqexp * qqexp
-  | Empty
+  | P of qqexp * qqexp (* cons pair *)
+  | Nil
 
 type body = define list * exp
 
 
-let rec to_string : (sexp list -> string) = function 
+let rec string_of : (sexp list -> string) = function 
     [] -> ""
-  | [x] -> to_string2 x
-  | x :: rest -> to_string2 x ^ " " ^ to_string rest
-and to_string2 = function
+  | [x] -> string2_of x
+  | x :: rest -> string2_of x ^ " " ^ string_of rest
+and string2_of = function
   | Int x  -> string_of_int x
   | Id x  -> x
-  | List x  -> "(" ^ to_string x ^ ")"
+  | List x  -> "(" ^ string_of x ^ ")"
   | Cons (x, y) ->
      (match y with 
-       Cons _ ->  "(" ^ to_string2 x ^ " " ^ to_string2 y ^ ")"
-     | _ -> "(" ^ to_string2 x ^ " . " ^ to_string2 y ^ ")"
+       Cons _ ->  "(" ^ string2_of x ^ " " ^ string2_of y ^ ")"
+     | _ -> "(" ^ string2_of x ^ " . " ^ string2_of y ^ ")"
      )
   | _ -> ""
 
@@ -132,13 +132,13 @@ and parseForm : sexp list -> exp = function
       (match rest with
         [a] ->
           (match parse_qq 0 a with
-             UnquoteSplice _ -> raise (ParseError ("qq splice: " ^ to_string rest))
+             UnquoteSplice _ -> raise (ParseError ("qq splice: " ^ string_of rest))
            | x -> QuasiQuoteExp (x)
           )
-      | qq -> raise (ParseError ("quasiquote: " ^ to_string qq))
+      | qq -> raise (ParseError ("quasiquote: " ^ string_of qq))
       )
   | Id "unquote" :: x | Id "unquote-splicing" :: x ->
-           raise (ParseError ("unquote not in qq: " ^ to_string x))
+           raise (ParseError ("unquote not in qq: " ^ string_of x))
   | Id "if" :: rest ->
      (match rest with
        pred ::conseq :: alt ->
@@ -163,7 +163,7 @@ and parseForm : sexp list -> exp = function
         | [x] -> parseExp x
         | x :: rest ->
            (* (if x (and rest) #f) *)
-           let a = List ([Id "if"; x; List (Id "and" :: rest); Bool false]) in
+           let a = List ([Id "if"; x; List (Id "and_" :: rest); Bool false]) in
            parseExp a
      )
   | Id "and__" :: rest -> AndExp (parseExplist rest)
@@ -360,14 +360,14 @@ and parseQQ level : sexp -> qqexp = function
 and parse_qq level : sexp -> qqexp = function
   | Syntax.List x ->
      let rec loop level = function
-         [] -> Empty
+         [] -> Nil
       | [Syntax.Id "unquote" as u; a] ->
          if level = 0 then
            Unquote(parseExp a)
          else
-           P (parse_qq (level - 1) u, P (parse_qq (level - 1) a, Empty))
+           P (parse_qq (level - 1) u, P (parse_qq (level - 1) a, Nil))
       | [Syntax.Id "quasiquote" as u; a] ->
-         P (parse_qq (level + 1) u, P (parse_qq (level + 1) a, Empty))
+         P (parse_qq (level + 1) u, P (parse_qq (level + 1) a, Nil))
 
       | Syntax.Id "unquote" :: _ ->
          raise (ParseError "unquote format")
@@ -386,7 +386,7 @@ and parse_qq level : sexp -> qqexp = function
          if level = 0 then
            UnquoteSplice(parseExp a)
          else
-           P (parse_qq (level - 1) u, P (parse_qq (level - 1) a, Empty))
+           P (parse_qq (level - 1) u, P (parse_qq (level - 1) a, Nil))
  
       | _ ->
          loop level x

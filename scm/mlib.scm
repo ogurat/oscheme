@@ -129,7 +129,9 @@
         #t
       (if (null? (cdr args))
           (car args)
-          `(if ,(car args) (aand ,@(cdr args)) #f)))))
+          `(if ,(car args)
+               (aand ,@(cdr args))
+               #f)))))
 
 (define-macro oor
   (lambda args
@@ -138,7 +140,9 @@
       (if (null? (cdr args))
           (car args)
           `(let ((value+ ,(car args)))
-             (if value+ value+ (oor ,@(cdr args))))))))
+             (if value+
+                 value+
+                 (oor ,@(cdr args))))))))
 
 (define-macro let*
   (lambda (args . body) 
@@ -146,7 +150,7 @@
         `(let (,(car args)) ,@body)
         `(let (,(car args)) (let* ,(cdr args) ,@body)))))
 
-(define-macro letrec
+#;(define-macro letrec
   (lambda (args . body)
     (let ((vars (map car args))
           (vals (map cadr args)))
@@ -212,7 +216,6 @@
                                         vars)))))))
          (loop ,@vals)))))
 
-(define-macro and2 (lambda (a b c) (and a b c)))
 
 (define (aa x y)
   (aand 'a 'b (+ x y) (* x y)))
@@ -220,17 +223,18 @@
 (define (dotest x1 x2)
   (define (f1)
     (ddo ((x x1 (cdr x))
-         (sum 0 (+ sum (car x))))
+          (sum 0 (+ sum (car x))))
       ((null? x) sum)))
   (define (f2)
-    (ddo ((x 0 (+ x 1)) (y x2))
+    (ddo ((x 0 (+ x 1))
+          (y x2))
       ((= x 5) 'a 'b y)))
   (list (f1) (f2)))
 
 (define (condtest y s)
  (list
-  (ccond ((eqv? y 1) 'first)
-         ((eqv? y 2) 'second)
+  (ccond ((eqv? y 1) 'a 'first)
+         ((eqv? y 2) 'b 'second)
          (else 'else))
   #;(ccond ('(abc edf ghi) => cdr)
            (else 'else2))

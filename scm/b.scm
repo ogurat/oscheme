@@ -14,7 +14,8 @@
          (sum 0 (+ sum (car x))))
       ((null? x) sum)))
   (define (f2)
-    (do ((x 0 (+ x 1)) (y x2))
+    (do ((x 0 (+ x 1))
+         (y x2))
       ((= x 5) 'a 'b y)))
   (list (f1) (f2)))
 
