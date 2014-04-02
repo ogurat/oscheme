@@ -5,6 +5,7 @@ open Syntax
 %token LPAREN RPAREN QUOTE DOT QQUOTE COMMA COMMAAT
 %token EOF
 %token SHARPSEMICOLON
+%token SHARPLPAREN
 %token <int> INTV
 %token <bool> BOOLV
 %token <char> CHARV
@@ -36,6 +37,7 @@ Sexp :
   | STRINGV { String $1 }
   | LPAREN Sexplist RPAREN { List $2 }
   | LPAREN Dotpair RPAREN { $2 }
+  | SHARPLPAREN Sexplist RPAREN { Vector $2 }
   | QUOTE Sexp { List [Id "quote"; $2]}
   | QQUOTE Sexp { List [Id "quasiquote"; $2] }
   | COMMA Sexp { List [Id "unquote"; $2] }

@@ -14,13 +14,13 @@ type 'a valtype =
   | StringV of string
   | SymbolV of id
   | ProcV  of id list * varid * 'a * 'a env
-  | MacroV of id list * varid * 'a * 'a env
+(*  | MacroV of id list * varid * 'a * 'a env *)
   | PrimV of ('a valtype list -> 'a valtype) 
   | PairV of 'a valtype ref * 'a valtype ref
   | EmptyListV
 (*  | ProperListV of valtype list *)
 (* list?の判定が定数時間で完了する。空リストを認めないとpair?の判定が簡単になる。ただしcdrの操作に注意が必要 *)
-(*  | VectorV of 'a valtype array *)
+  | VectorV of 'a valtype array
   | UnitV
   | UnboundV
 and 'a env = (id * 'a valtype ref) list
@@ -113,9 +113,10 @@ let rec evalQuote = function
  *)
   | Syntax.Cons (x, y) ->
      PairV (ref (evalQuote x), ref (evalQuote y))
+  | Syntax.Vector x -> VectorV (Array.map evalQuote (Array.of_list x))
 
 let rec val_to_sexp = function
-  IntV x -> Syntax.Int x
+    IntV x -> Syntax.Int x
   | BoolV x -> Syntax.Bool x
   | CharV x -> Syntax.Char x
   | StringV x -> Syntax.String x

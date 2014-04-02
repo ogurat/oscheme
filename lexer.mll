@@ -12,7 +12,7 @@ let initial = ['a'-'z' '!' '$' '%'  '&' '*' '/' ':' '<' '=' '>' '?' '^' '_' '~']
 
 rule main = parse
 
-| ';'  [^ '\r' '\n']* { main lexbuf }
+| ';'  [^ '\r' '\n' '\012']* { main lexbuf }
   (* ignore spacing and newline characters *)
 |  [' ' '\009' '\012' '\r' '\n']+   { main lexbuf }
 
@@ -29,9 +29,8 @@ rule main = parse
 | ",@" { Sparser.COMMAAT }
 | ',' { Sparser.COMMA }
   
-| ['a'-'z' '!' '$' '%'  '&' '*' '/' ':' '<' '=' '>' '?' '^' '_' '~']
+| ['a'-'z' '!' '$' '%'  '&' '*' '/' ':' '<' '=' '>' '?' '^' '_' '~' '+' '-']
    ['a'-'z' '!' '$' '%'  '&' '*' '/' ':' '<' '=' '>' '?' '^' '_' '~' '0'-'9' '+' '-' '.' '@' '\'']*
-| '+' | '-'
 | "..."
     { let id = Lexing.lexeme lexbuf in
       Sparser.ID id
@@ -40,6 +39,18 @@ rule main = parse
 
 | "#;" { Sparser.SHARPSEMICOLON }
 
+| "#(" { Sparser.SHARPLPAREN }
+| '#' '\\' ['a'-'z' '!' '$' '%'  '&' '*' '/' ':' '<' '=' '>' '?' '^' '_' '~' '0'-'9' '+' '-' '.' '@' '\''] { Sparser.CHARV (Lexing.lexeme_char lexbuf 2) }
+
 | eof { Sparser.EOF }
 
-
+| _
+    {
+      let message = Printf.sprintf
+        "unknown token %s near characters %d-%d"
+        (Lexing.lexeme lexbuf)
+        (Lexing.lexeme_start lexbuf)
+        (Lexing.lexeme_end lexbuf)
+      in
+      failwith message
+    }
