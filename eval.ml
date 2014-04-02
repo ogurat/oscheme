@@ -8,7 +8,7 @@ open Valtype
 
 let rec evalExp env = function
   | SelfEvalExp sexp -> evalSelf sexp
-  | UnitExp -> UnitV
+  | UnspecifiedExp -> UnitV
   | VarExp x ->
      (match !(lookup x env) with
         UnboundV -> failwith ("runtime: var " ^ x ^ " Unbound")
@@ -36,23 +36,7 @@ let rec evalExp env = function
              )
            | _ -> PairV (ref (evalQuasi x), ref (evalQuasi y))
           )
-(*
-       | L x ->
-          let rec loop = function
-              [] -> EmptyListV
-            | a :: rest ->
-               (match a with
-                  UnquoteSplice x ->
-                  splice rest (evalExp env x)
-                | _ -> PairV (ref (evalQuasi a), ref (loop rest))
-               )
-          and splice rest = function
-              EmptyListV -> loop rest
-            | PairV (a, b) -> (PairV (a, ref (splice rest !b)))
-            | _ -> failwith "splice not list"
-             in
-          loop x
- *)
+
      in evalQuasi x
 
   | IfExp (c, a, b) ->
@@ -80,21 +64,19 @@ let rec evalExp env = function
 
   | LambdaExp (ids, varid, exp) ->
       ProcV (ids, varid, exp, env)
+
   | MacroExp (ids, vararg, exp) ->
-      MacroV (ids, vararg, exp, env)
+      ProcV (ids, vararg, exp, env) (* MacroVでなくてもいいか?? *)
+
   | ApplyExp (exp, args) ->
-      let proc = evalExp env exp
-      and a = List.map (evalExp env) args in
-      eval_apply proc a
+     let proc = evalExp env exp
+     and a = List.map (evalExp env) args in
+     eval_apply proc a
   | MacroAppExp (id, sexps) ->
-     let args = List.map evalQuote sexps in
-     (match !(lookup id env) with
-      | MacroV (ids, varid, exp, en) ->
-         let newenv = extend_var en ids varid args in
-         let v = evalExp newenv exp in
-         evalExp env (parseExp (val_to_sexp v))
-      | _ -> failwith "not macro"
-     )
+     let args = List.map evalQuote sexps
+     and m = !(lookup id env) in
+     let v = eval_apply m args in
+     evalExp env (parseExp (val_to_sexp v))
 (*
   | LetExp (binds, (defs, exp)) ->
       let a = evalextend (fun e en -> evalExp en e) env binds in

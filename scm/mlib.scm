@@ -77,18 +77,12 @@
         '()
       (cons (fn (car ls)) (map fn (cdr ls))))))
 
-(define map-2
+#;(define map-2
   (lambda (fn xs ys)
     (if (null? xs)
         '()
         (cons (fn (car xs) (car ys)) (map-2 fn (cdr xs) (cdr ys))))))
 
-; for racket
-#;(define-for-syntax map-2
-  (lambda (fn xs ys)
-    (if (null? xs)
-        '()
-        (cons (fn (car xs) (car ys)) (map-2 fn (cdr xs) (cdr ys))))))
 
 ; フィルター
 (define filter
@@ -158,23 +152,14 @@
             ,@(map-2 (lambda (x y) `(set! ,x ,y)) vars vals)
             ,@body))))
 
+
+
 (define-macro bbegin
   (lambda args
     (if (null? args)
         `((lambda () '*undef*))
         `((lambda () ,@args)))))
 
-#;(define-macro ccond
-  (lambda args
-    (if (null? args)
-        '*undef*
-      (if (eq? (caar args) 'else)
-          `(begin ,@(cdar args))
-        (if (null? (cdar args))
-                (caar args)
-                `(if ,(caar args)
-                     (begin ,@(cdar args))
-                     (ccond ,@(cdr args))))))))
 
 (define-macro ccond
   (lambda args
@@ -201,6 +186,11 @@
 
 (define-macro ddo
   (lambda (var-form test-form . args)
+    (define map-2
+      (lambda (fn xs ys)
+        (if (null? xs)
+            '()
+            (cons (fn (car xs) (car ys)) (map-2 fn (cdr xs) (cdr ys))))))
     (let ((vars (map car var-form))
           (vals (map cadr var-form))
           (step (map cddr var-form)))
@@ -217,8 +207,26 @@
          (loop ,@vals)))))
 
 
+
+(define-macro (aaa x y z)
+  (define (sq x) (* x x))
+  `(and x y z))
+
+(define-macro bbb
+  (lambda (x y z)
+    (define (sq x) (* x x))
+    `(a b c)))
+
+
 (define (aa x y)
   (aand 'a 'b (+ x y) (* x y)))
+
+(define (cond1 x s)
+  (ccond ((eqv? x 1) 'a 'first)
+         ((eqv? x 2) 'b 'second)
+         ((assoc s '((a 1) (b 2))))
+         (else 'else)))
+
 
 (define (dotest x1 x2)
   (define (f1)
@@ -231,10 +239,10 @@
       ((= x 5) 'a 'b y)))
   (list (f1) (f2)))
 
-(define (condtest y s)
+(define (condtest x s)
  (list
-  (ccond ((eqv? y 1) 'a 'first)
-         ((eqv? y 2) 'b 'second)
+  (ccond ((eqv? x 1) 'a 'first)
+         ((eqv? x 2) 'b 'second)
          (else 'else))
   #;(ccond ('(abc edf ghi) => cdr)
            (else 'else2))

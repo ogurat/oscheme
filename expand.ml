@@ -56,24 +56,20 @@ let rec expandExp env = function
 
   | LambdaExp (ids, varid, exp) ->
       LambdaExp (ids, varid, expandExp env exp)
-
+(*
   | MacroExp (ids, varid, exp) ->
       MacroExp (ids, varid, expandExp env exp)
-
+ *)
   | ApplyExp (exp, args) ->
       let proc = expandExp env exp
       and a = List.map (expandExp env) args in
       ApplyExp (proc,a)
  
   | MacroAppExp (id, sexps) ->
-     let args = List.map evalQuote sexps in
-     (match !(lookup id env) with
-      | MacroV (ids, varid, exp, en) ->
-         let newenv = extend_var en ids varid args in
-         let v = Eval.evalExp newenv exp in
-         expandExp env (Parser.parseExp (val_to_sexp v))
-      | _ -> failwith "not macro"
-     )
+     let args = List.map evalQuote sexps
+     and proc = !(lookup id env) in
+     let v = Eval.eval_apply proc args in
+     expandExp env (parseExp (val_to_sexp v))
 
   | LetrecExp (binds, exp) ->
       let a = Eval.extendletrec env binds

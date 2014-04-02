@@ -10,3 +10,4 @@ type sexp =
   | Id of string
   | List of sexp list
   | Cons of sexp * sexp
+  | Vector of sexp list

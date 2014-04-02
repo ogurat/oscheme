@@ -13,7 +13,7 @@ type varid =
 type exp =
   | SelfEvalExp of sexp
   | VarExp of id
-  | UnitExp
+  | UnspecifiedExp
   | QuoteExp of sexp
   | QuasiQuoteExp of qqexp
   | IfExp of exp * exp * exp
@@ -45,6 +45,7 @@ and qqexp =
 
 type body = define list * exp
 
+type macro = id list * varid * exp (* macroのみの環境(namespace)を想定  *)
 
 let rec string_of : (sexp list -> string) = function 
     [] -> ""
@@ -97,6 +98,11 @@ let rec body_to_exp = function
   | [x] -> x
   | x :: rest -> SeqExp (x, body_to_exp rest)
 
+let rec body_to_exp2 = function
+    [] -> UnspecifiedExp
+  | [x] -> x
+  | x :: rest -> SeqExp (x, body_to_exp rest)
+
 let rec splitBindings = function
     [] -> [],[]
   | List [id; ex] :: rest -> 
@@ -110,6 +116,7 @@ let rec unzipBindings parse : sexp list -> (id list * exp list) = function
       let (ids, x) = unzipBindings parse rest in
       (id :: ids), (parse ex :: x)
   | _ ->raise (ParseError "bindings")
+
 
 
 let rec parseExp : sexp -> exp = function
@@ -144,7 +151,7 @@ and parseForm : sexp list -> exp = function
        pred ::conseq :: alt ->
          let altexp = (match alt with
            [x] -> parseExp x
-         | [] -> UnitExp
+         | [] -> UnspecifiedExp
          | _ -> raise (ParseError "if")
          ) in 
          IfExp (parseExp pred, parseExp conseq, altexp)
@@ -169,17 +176,8 @@ and parseForm : sexp list -> exp = function
   | Id "and__" :: rest -> AndExp (parseExplist rest)
   | Id "or" :: rest -> OrExp (parseExplist rest)
   | Id "lambda" :: rest ->
-      (match rest with
-        List idlist :: rest ->
-          let ids = parseIdlist idlist in
-          LambdaExp (ids, Fixed, parseBodyLetrec rest)
-      | Id id :: rest ->
-          LambdaExp ([], Vararg id, parseBodyLetrec rest)
-      | Cons _ as x :: rest ->
-          let (ids, varid) = parseIdCons x in
-          LambdaExp (ids, varid, parseBodyLetrec rest)
-      | _ -> raise (ParseError "lambda")
-      )
+     let (ids, varid, exp) = parseLambda rest in
+     LambdaExp (ids, varid,exp)
   | Id "cond" :: rest ->
       parseClauses' rest
   | Id "let"   :: rest -> parseLet rest
@@ -225,6 +223,16 @@ and parseForm : sexp list -> exp = function
      )
   | [] -> raise (ParseError "empty form")
 
+and parseLambda = function
+    List idlist :: rest ->
+     let ids = parseIdlist idlist in
+      (ids, Fixed, parseBodyLetrec rest)
+  | Id id :: rest ->
+      ([], Vararg id, parseBodyLetrec rest)
+  | Cons _ as x :: rest ->
+     let (ids, varid) = parseIdCons x in
+      (ids, varid, parseBodyLetrec rest)
+  | x -> raise (ParseError ("lambda: " ^ string_of x))
 
 and parseLet = function
   | Id var :: List binds :: body ->
@@ -276,7 +284,7 @@ and parseDo = function (* todo:外側の変数loopを隠してしまう *)
   *)
      let apploop = ApplyExp (VarExp "loop", steps) in
      let next = body_to_exp (cmds @ [apploop]) in
-     let loopbody = IfExp (test, body_to_exp exps, next) in
+     let loopbody = IfExp (test, body_to_exp2 exps, next) in
      let loop = LambdaExp (vars, Fixed, loopbody) in
      LetrecExp (["loop", loop], ApplyExp (VarExp "loop", inits))
  
@@ -295,11 +303,11 @@ and parseDo_ = function
      ((loop (lambda (vars) (if test (begin exps) (begin commands (loop steps))))))
      (loop inits)
   *)
-     DoExp (specs, test, body_to_exp exps, cmds)
+     DoExp (specs, test, body_to_exp2 exps, cmds)
  
   | _ -> raise (ParseError "do ")
 
-and splitSpecs  : sexp list ->  (id list * exp list * exp list)  = function
+and splitSpecs : sexp list ->  (id list * exp list * exp list)  = function
     [] -> [],[],[]
   | List [Id var; init; step] :: rest -> 
       let (vars, inits, steps) = splitSpecs rest in
@@ -308,6 +316,7 @@ and splitSpecs  : sexp list ->  (id list * exp list * exp list)  = function
       let (vars, inits, steps) = splitSpecs rest in
       (var :: vars), (parseExp init :: inits), (VarExp var :: steps)
   | _ ->raise (ParseError "do specs")
+
 
 and parseExplist (l : sexp list) =
   List.map parseExp l
@@ -318,9 +327,8 @@ and parseBinding (l: sexp list) : (id * exp) list =
              | _ -> raise (ParseError "bindings")) l
 
 
-
 and parseClauses' = function
-    [] -> UnitExp  (* else節なし  *)
+    [] -> UnspecifiedExp  (* else節なし  *)
   | List e :: rest ->
       (match e, rest with
         Id "else" :: body,  [] ->
@@ -337,26 +345,7 @@ and parseClauses' = function
       | [], _ -> raise (ParseError "cond clause")
       )
   | _ -> raise (ParseError "cond clause")
-(*
-and parseQQ level : sexp -> qqexp = function
-  | Syntax.List x ->
-     (match x with
-        [Syntax.Id "quasiquote"; a] ->
-           L (List.map (parseQQ (level + 1)) x)
-      | [Syntax.Id "unquote"; a] ->
-         if level = 0 then
-           Unquote(parseExp a)
-         else
-           L (List.map (parseQQ (level - 1)) x)
-      | [Syntax.Id "unquote-splicing"; a] ->
-         if level = 0 then
-           UnquoteSplice(parseExp a)
-         else
-           L (List.map (parseQQ (level - 1)) x)
-      | _ -> L (List.map (parseQQ level) x)
-     )
-  | x -> S x
- *)
+
 and parse_qq level : sexp -> qqexp = function
   | Syntax.List x ->
      let rec loop level = function
@@ -399,6 +388,7 @@ and parseQuasi depth : sexp -> sexp = function
   | Syntax.List [Syntax.List (Syntax.Id "unquote-splicing":: form :: rest)] ->
      append form (Syntax.List (Syntax.Id "quasiquote" :: rest))
  *)
+
 and parseClauses = function
     [] -> [] (* else節なし  *)
   | List e :: rest ->
@@ -426,6 +416,13 @@ and clausestoif clauses =
                   (UnitExp)
  *)
 
+and parseBodyLetrec sexps : exp =
+  let (defs, exp) = parseBody sexps in
+  match defs with
+    [] -> exp
+  | x -> LetrecExp (defs, exp)
+
+
 (* 定義は[本体]の先頭で有効 *)
 and parseDef : sexp list -> define = function
   (* (define (var formals) exps *)
@@ -441,19 +438,19 @@ and parseDef : sexp list -> define = function
   | _ -> raise (ParseError "define: invalid form")
 
 and parseDefMacro : sexp list -> define = function
-  (* (define (var formals) exp *)
-  | [List (Id var :: formals); exp] ->
-      let ids = parseIdlist formals in
-      var, MacroExp (ids, Fixed, parseExp exp)
-  | [Id var; List [Id "lambda"; List formals; exp]] ->
-      let ids = parseIdlist formals in
-      var, MacroExp (ids, Fixed, parseExp exp)
-  | [Id var; List [Id "lambda";  a; exp]] ->
-      let (ids, varid) = parseIdCons a in
-      var, MacroExp (ids, varid, parseExp exp)
-  | [Id var ; List [Id "lambda"; Id formal; exp]] ->
-      var, MacroExp ([], Vararg formal, parseExp exp)
-  | _ -> raise (ParseError "define macro: invalid form")
+  (* (define (var formals) exps *)
+  | List (Id var :: formals) :: exps ->
+      let ids = parseIdlist formals and body = parseBodyLetrec exps in
+      var, MacroExp (ids, Fixed, body)
+  | Cons (Id var, x) :: exps ->
+      let (ids, varid) = parseIdCons x and body = parseBodyLetrec exps in
+      var, MacroExp (ids, varid, body)
+  (* (define id ex *)
+  | [Id var; List (Id "lambda" :: rest)] ->
+     let (ids, varid, exp) = parseLambda rest in
+     var, MacroExp (ids, varid, exp)
+  | _ -> raise (ParseError "define-macro: invalid form")
+
 
 and parseBody : sexp list -> body = function
   | [] -> raise (ParseError "parse body: empty body")
@@ -466,11 +463,6 @@ and parseBody : sexp list -> body = function
   | exl -> let a = List.map parseExp exl in
            [], body_to_exp a
 
-and parseBodyLetrec sexps : exp =
-  let (defs, exp) = parseBody sexps in
-  match defs with
-    [] -> exp
-  | x -> LetrecExp (defs, exp)
 
 
 let rec parseDefs = function

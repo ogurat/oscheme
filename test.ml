@@ -162,6 +162,12 @@ let macro = ("scm/mlib.scm", [
 
 	       ])
 
+let al = ("scm/alexpander.scm", [
+
+"(alexpander-repl)", Ex "'()"
+
+	       ])
+
 
 
 

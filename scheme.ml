@@ -289,17 +289,17 @@ let rec ppp : 'a valtype list -> 'a valtype list = function
   | a :: rest -> a :: (ppp rest)
 
 (* global environment *)
-let ge eval_apply =
+let ge apply =
 
 let apply proc args =
-   eval_apply proc (ppp args)
+   apply proc (ppp args)
 
 
 and map proc l =
   let rec impl = function
     | EmptyListV -> EmptyListV
     | PairV(x, rest) ->
-        PairV (ref (eval_apply proc [!x]), ref (impl !rest))
+        PairV (ref (apply proc [!x]), ref (impl !rest))
     | _ -> failwith "not pair: map"
   in impl l
 
@@ -307,7 +307,7 @@ and foldl proc init l =
   let rec impl accum = function
     | EmptyListV -> accum
     | PairV(x, rest) ->
-        impl (eval_apply proc [!x; accum]) !rest
+        impl (apply proc [!x; accum]) !rest
     | _ -> failwith "not pair: foldl"
   in impl init l
 
@@ -315,7 +315,7 @@ and foldr proc init l =
   let rec impl = function
     | EmptyListV -> init
     | PairV(x, rest) ->
-        eval_apply proc [!x; impl !rest]
+        apply proc [!x; impl !rest]
     | _ -> failwith "not pair: foldr"
   in impl l
 
@@ -323,7 +323,7 @@ and foldr proc init l =
 and makePrimV (id, f) = (id, ref (PrimV f))
 in
    List.map makePrimV [
-  ("+", add (*(apply args) *) ) ;
+  ("+", add);
   ("*", multi);
   ("-", minus);
   ("abs", function
