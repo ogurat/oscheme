@@ -11,9 +11,19 @@ open Valtype
 let rec printval = function
     IntV i -> string_of_int i
   | BoolV x ->  (if x then "#t" else "#f")
-(*  | CharV x -> string_of_char x *)
-  | SymbolV x ->  (x)
+  | CharV x -> String.make 1 x
+  | SymbolV x -> (x)
   | StringV x ->  x (* "\"" ^ x ^ "\"" *)
+  | VectorV x ->
+     let rec loop n = 
+       if n = Array.length x then
+         ""
+       else
+         " " ^ printval x.(n) ^ loop (n + 1) in
+     if Array.length x > 0 then
+       "#(" ^ printval x.(0) ^ loop 1 ^ ")"
+     else
+       "#()"
   | ProcV (args, _, _, env) ->
      let rec pprest = function
 	 [] -> ""
@@ -198,8 +208,7 @@ let rec append_impl a b =
 let rec append_impl l1 l2 =
   match l1 with
     EmptyListV -> l2
-  | PairV (a, rest) -> cons !a (append_impl !rest l2)
-  | _ -> failwith "append"
+  | x -> cons (car x) (append_impl (cdr x) l2)
 let rec append = function
     [] -> EmptyListV
   | [x] -> x
@@ -234,7 +243,7 @@ let rec list_tail ls k =
 let list_ref ls k =
     (match (list_tail ls k) with
 	PairV (a, _) -> !a
-      | _ -> failwith "list_tail")
+      | _ -> failwith "list_ref")
 
 
 let mem pred o l =
@@ -266,12 +275,29 @@ let newline = function
 let stringp = function
     StringV _ -> true
   | _ -> false
+let rec string_append  = function
+    [] -> ""
+  | StringV x :: rest -> x ^ string_append rest
+  | _ -> failwith "Arity mismatch: string-append"
 
 let symbolp = function
     SymbolV _ ->  true
   | _ ->  false
 
+let vectorp = function
+    VectorV _ ->  true
+  | _ ->  false
+(*
+let vec_length = function
+    VectorV x -> Array.length x
+  | _ -> failwith "Arity mismatch: vector-length not vector"
+ *)
+let vec_to_list = function
+    VectorV x -> Array.fold_right (fun x y -> PairV (ref x, ref y)) x EmptyListV
+  | _ -> failwith "Arity mismatch: vector->list not vector"
 
+let makevector args =
+   VectorV (Array.of_list args)
 
 
 (* apply primitive *)
@@ -295,12 +321,46 @@ let apply proc args =
    apply proc (ppp args)
 
 
-and map proc l =
+and map1 proc l =
   let rec impl = function
     | EmptyListV -> EmptyListV
-    | PairV(x, rest) ->
-        PairV (ref (apply proc [!x]), ref (impl !rest))
+    | x -> cons (apply proc [car x]) (impl (cdr x))
+  in impl l
+
+and map2 proc l1 l2 =
+  let rec impl x y =
+    (match x, y with
+    | EmptyListV, _ | _, EmptyListV -> EmptyListV
+    | x, y ->
+        cons (apply proc [car x; car y]) (impl (cdr x) (cdr y))
+    )
+  in impl l1 l2
+(*
+and map3 proc l1 l2 l3 =
+  let rec impl x1 x2 x3 =
+    (match x1, x2, x3 with
+    | EmptyListV, _,_ | _, EmptyListV,_ | _,_,EmptyListV -> EmptyListV
+    | PairV(x1, rest1), PairV (x2, rest2), PairV(x3, rest3) ->
+        PairV (ref (apply proc [!x1; !x2; !x3]), ref (impl !rest1 !rest2 !rest3))
     | _ -> failwith "not pair: map"
+    )
+  in impl l1 l2 l3
+ *)
+
+and map proc ls =
+  let rec impl xs =
+    if List.exists (function  EmptyListV -> true | _ -> false) xs then
+      EmptyListV
+    else
+      let a = List.map car xs
+      and b = List.map cdr xs in
+      cons (apply proc a) (impl b) 
+  in impl ls
+
+and foreach proc l =
+  let rec impl = function
+    | EmptyListV -> UnitV
+    | x -> apply proc [car x]; impl (cdr x)
   in impl l
 
 and foldl proc init l =
@@ -354,9 +414,16 @@ in
   (">",  function
     | [IntV i; IntV j] -> BoolV (i > j)
     | _ -> failwith "Arity mismatch: >");
+  (">=", function
+    | [IntV i; IntV j] -> BoolV (i >= j)
+    | _ -> failwith "Arity mismatch: >=");
+  ("positive?", function
+     [IntV x] -> BoolV (x > 0)
+   | _ -> failwith "Arity mismatch: positive?");
   ("number?", function
        [x] -> BoolV (numberp x)
      | _ -> failwith "Arity mismatch: number?");
+
   ("pair?", function
        [x] -> BoolV (pairp x)
      | _ -> failwith "Arity mismatch: pair?");
@@ -390,6 +457,9 @@ in
   ("caadr", function
        [x] -> car (car (cdr x))
      | _ -> failwith "Arity mismatch: caadr");
+  ("cadar", function
+       [x] -> car (cdr (car x))
+     | _ -> failwith "Arity mismatch: cadar");
   ("caddr", function
        [x] -> car (cdr (cdr x))
      | _ -> failwith "Arity mismatch: caddr");
@@ -441,8 +511,16 @@ in
      | [o; l] -> assoc equalp o l
      | _ -> failwith "Arity mismatch: assoc");
   ("map", function
-       [proc; l] -> map proc l
+       [proc; l] -> map1 proc l
+     | [proc; l1; l2] -> map2 proc l1 l2
+(*
+     | [proc; l1; l2; l3] -> map3 proc l1 l2 l3
+ *)
+     | proc :: ls -> map proc ls
      | _ -> failwith "Arity mismatch: map");
+  ("for-each", function
+       [proc; l] -> foreach proc l
+     | _ -> failwith "Arity mismatch: for-each");
   ("foldl", function
        [proc; init; l] -> foldl proc init l
      | _ -> failwith "Arity mismatch: foldl");
@@ -460,12 +538,54 @@ in
   ("read", function
        [] -> read ()
      | _ -> failwith "Arity mismatch: read");
+  ("eof-object?", function
+     [v] -> BoolV false
+   | _ -> failwith "Arity mismatch: eof-object?");
+
   ("string?", function
        [x] -> BoolV (stringp x)
      | _ -> failwith "Arity mismatch: string?");
+  ("string-length", function
+     [StringV x] -> IntV (String.length x)
+   | _ -> failwith "Arity mismatch: string-length");
+  ("string-ref", function
+     [StringV s; IntV i] -> CharV (s.[i])
+   | _ -> failwith "Arity mismatch: string-ref");
+  ("string-append", fun x ->
+                    StringV (string_append x));
+  ("string->symbol", function
+     [StringV x] -> SymbolV x
+   | _ -> failwith "Arity mismatch: symbol->sting");
+
+  ("number->string", function
+     [IntV x] -> StringV (string_of_int x)
+   | _ -> failwith "Arity mismatch: number->sting");
+
+  ("char=?", function
+     [CharV x1; CharV x2] -> BoolV (x1 = x2)
+   | _ -> failwith "Arity mismatch: char=?");
+
+  ("vector?", function
+     [x] -> BoolV (vectorp x)
+   | _ -> failwith  "Arity mismatch: vector?");
+  ("vector-length", function
+     [VectorV x] -> IntV (Array.length x)
+   | _ -> failwith  "Arity mismatch: vector-length");
+  ("vector", makevector);
+  ("vector->list", function
+     [x] -> vec_to_list x
+   | _  -> failwith "Arity mismatch: vector->list");
+  ("vector-ref", function
+     [VectorV x; IntV i] -> x.(i)
+   | _ ->  failwith "Arity mismatch: vector-ref");
+
   ("symbol?", function
-       [x] -> BoolV (symbolp x)
-     | _ -> failwith "Arity mismatch: symbol?");
+     [x] -> BoolV (symbolp x)
+   | _ -> failwith "Arity mismatch: symbol?");
+  ("symbol->string", function
+     [SymbolV x] -> StringV x
+   | _ -> failwith "Arity mismatch: symbol->sting");
+
   ("apply", function
        (x :: y) -> apply x y
      | _ -> failwith "Arity mismatch: apply");
@@ -473,4 +593,3 @@ in
        [x] -> apply x [EmptyListV]
      | _ -> failwith "Arity mismatch: force");
   ]
-

@@ -51,7 +51,9 @@ let bcase = ("scm/b.scm", [
 ("(xtest 3 8)", Ex "'(24 9 64)");
 ("(condtest 1 'b)", Ex "'(first  (edf ghi) 2 (b 2) (y z) xyz)");
 ("(condtest 2 'c)", Ex "'(second  (edf ghi) else2 else3 (y z) xyz)");
+("(casetest 6)", Ex "'second" ) ;
 
+("(maptest)", Ex "'((9 16 25) (23 27 31) ((a x 1 asd) (s y 2 fgh) (d z 3 jkl)))" ) ;
 ])
 
 let lettestcase = ("scm/lettest.scm", [
@@ -61,6 +63,7 @@ let lettestcase = ("scm/lettest.scm", [
 
 ("(mapsquare '(3 4 5))", Ex "'(9 16 25)") ;
 ("(letlist 3 4)", Ex "'(9 8 5)") ;
+("(letlist2 3)", Ex "'(9 18 27)") ;
 ("(mapf fourtimes)", Ex "'(16 20 72 76 80)") ;
 
 	       ])

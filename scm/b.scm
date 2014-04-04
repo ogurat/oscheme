@@ -245,6 +245,26 @@
  ;       (#f 'last))
   ))
 
+(define (casetest x)
+  (case x
+    ((2 3 5 7) 'prime)
+    ((1 4 6 8 9) 'second)
+    (else 'else)))
+
+(define (casetest2)
+  (case (* 2 3)
+    ((2 3 5 7) 'prime)
+    ((1 4 6 8 9) 'second)))
+
+#;(define (casetest3)
+  (case 2
+    ((2 3 5 7) => square)
+    ((1 4 6 8 9) 'second)))
+
+#;(define (casetest4)
+  (case 'a
+    ((a b c d) => (lambda (x) (cons x 'd)))
+    ((e f g) 'second)))
 
 
 (define (a1 x)
@@ -291,6 +311,13 @@
                  (cons (car numbers) neg))))))
 
 
+(define (maptest)
+  (list
+   (map square '(3 4 5))
+   (map + '(2 3 4 ) '(4 5 6) '(7 8 9) '(10 11 12))
+   (map list '(a s d) '(x y z) '(1 2 3 4 5) '(asd fgh jkl))))
+
+
 (begin
   (display (dotest '(1 2 3 4) 'c))
   (display (list (a1 5) (a1 4) (a2 4 5) (a5 10 5)))
@@ -308,6 +335,8 @@
   (display (xtestt 3 8))
   (display ((aaa 7 6)))
   (display (testand))
+  (display (condtest 1 'b))
+  (display (condtest 2 'c))
   (testdata)
   )
 
