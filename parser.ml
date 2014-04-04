@@ -24,15 +24,14 @@ type exp =
   | MacroAppExp of id * sexp list
   | LetrecExp of (id * exp) list * exp
   | DoExp of (id list * exp list * exp list) * exp * exp * exp list
-  | CondClauseExp of condclause
+  | CondArrow of exp * exp * exp
+  | CondVal of exp * exp
+(*  | CondClauseExp of condclause *)
   | SetExp of id * exp
   | SeqExp of exp * exp
   | MacroExp of id list * varid * exp
 and define = id * exp
 (* and body = define list * exp *)
-and condclause = 
-   ARROW of exp * exp * exp
- | VAL of exp * exp
 and qqexp =
     S of sexp (* s expression *)
   | Unquote of exp
@@ -100,8 +99,7 @@ let rec body_to_exp = function
 
 let rec body_to_exp2 = function
     [] -> UnspecifiedExp
-  | [x] -> x
-  | x :: rest -> SeqExp (x, body_to_exp rest)
+  | x -> body_to_exp x
 
 let rec splitBindings = function
     [] -> [],[]
@@ -120,7 +118,7 @@ let rec unzipBindings parse : sexp list -> (id list * exp list) = function
 
 
 let rec parseExp : sexp -> exp = function
-  | Int _ | Bool _ | Char _ | String _ as a -> SelfEvalExp a
+  | Int _ | Bool _ | Char _ | String _ | Vector _ as a -> SelfEvalExp a
   | Id x  -> VarExp x
   | List x -> parseForm x
 
@@ -140,7 +138,7 @@ and parseForm : sexp list -> exp = function
         [a] ->
           (match parse_qq 0 a with
              UnquoteSplice _ -> raise (ParseError ("qq splice: " ^ string_of rest))
-           | x -> QuasiQuoteExp (x)
+           | x -> QuasiQuoteExp x
           )
       | qq -> raise (ParseError ("quasiquote: " ^ string_of qq))
       )
@@ -178,13 +176,15 @@ and parseForm : sexp list -> exp = function
   | Id "lambda" :: rest ->
      let (ids, varid, exp) = parseLambda rest in
      LambdaExp (ids, varid,exp)
-  | Id "cond" :: rest ->
-      parseClauses' rest
+
+  | Id "cond" :: rest -> parseClauses' rest
+  | Id "case" :: rest -> parseCase rest
   | Id "let"   :: rest -> parseLet rest
 (*
   | Id "let_"  :: rest -> parseLet_ rest
   | Id "let__" :: rest -> parseLet__ rest
  *)
+  | Id "let*" :: rest -> parseLetstar rest
   | Id "letrec" :: rest ->
       (match rest with
         List binds :: b ->
@@ -269,6 +269,19 @@ and parseLet_ = function
      parseExp x
   | _ -> raise (ParseError "let")
 
+and parseLetstar = function
+  | List binds :: body ->
+     let a =
+       (match binds with
+          [] -> List (Id "let" :: List [] :: body)
+        | List [name; value] :: rest ->
+           List [Id "let"; List [List [name; value]]; List (Id "let*" :: List rest :: body)]
+        | _ -> raise (ParseError "ler*")
+       ) in
+     parseExp a
+  | _ -> raise (ParseError "let*")
+
+
 
 and parseDo = function (* todo:外側の変数loopを隠してしまう *)
 (* testが成立すると, expsを評価してdoを抜ける *)
@@ -335,16 +348,42 @@ and parseClauses' = function
           body_to_exp (List.map parseExp body)
       | Id "else" :: _,     _  ->
           raise (ParseError "else clause is not last")
-      | [cond; Id "=>"; fn],_  ->
-          CondClauseExp (ARROW (parseExp cond, parseExp fn, parseClauses' rest))
-      | cond :: [],         _  ->
-          CondClauseExp (VAL (parseExp cond, parseClauses' rest))
-      | cond :: body, _  ->
+      | [test; Id "=>"; fn],_  ->
+          CondArrow (parseExp test, parseExp fn, parseClauses' rest)
+      | test :: [],         [] ->
+          parseExp test
+      | test :: [],         _  ->
+          CondVal (parseExp test, parseClauses' rest)
+      | test :: body,       _  ->
           let v = body_to_exp (List.map parseExp body) in
-          IfExp (parseExp cond, v, parseClauses' rest)
-      | [], _ -> raise (ParseError "cond clause")
+          IfExp (parseExp test, v, parseClauses' rest)
+      | [],                 _ -> raise (ParseError "cond clause")
       )
   | _ -> raise (ParseError "cond clause")
+
+
+and parseCase =
+  let rec loop key = function
+      [] ->  UnspecifiedExp
+    | List x :: rest ->
+       (match x with
+          Id "else" :: result ->
+          body_to_exp (List.map parseExp result)
+        | [List _ as atoms; Id "=>"; result] -> 
+           let a = parseExp result 
+           and appmemv = ApplyExp (VarExp "memv", [key; QuoteExp atoms]) in
+           IfExp (appmemv, ApplyExp (a, [key]), loop key rest)
+        | List _ as atoms :: results ->
+           let a = List.map parseExp results 
+           and appmemv = ApplyExp (VarExp "memv", [key; QuoteExp atoms]) in
+           IfExp (appmemv, body_to_exp a, loop key rest)
+        | _ -> raise (ParseError "case") 
+       )
+    | _ -> raise (ParseError "case") in
+  function
+    key :: rest -> loop (parseExp key) rest
+  | _ -> raise (ParseError "case")
+
 
 and parse_qq level : sexp -> qqexp = function
   | Syntax.List x ->
@@ -352,7 +391,7 @@ and parse_qq level : sexp -> qqexp = function
          [] -> Nil
       | [Syntax.Id "unquote" as u; a] ->
          if level = 0 then
-           Unquote(parseExp a)
+           Unquote (parseExp a)
          else
            P (parse_qq (level - 1) u, P (parse_qq (level - 1) a, Nil))
       | [Syntax.Id "quasiquote" as u; a] ->
@@ -373,7 +412,7 @@ and parse_qq level : sexp -> qqexp = function
  *)
       | [Syntax.Id "unquote-splicing" as u; a] -> (* listの中にあるべき *)
          if level = 0 then
-           UnquoteSplice(parseExp a)
+           UnquoteSplice (parseExp a)
          else
            P (parse_qq (level - 1) u, P (parse_qq (level - 1) a, Nil))
  

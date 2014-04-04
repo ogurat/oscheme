@@ -149,7 +149,21 @@ let rec analyzeExp  : exp -> 'a proctype = function
        let a = extendletrec env bb in
        e a
 
-  | CondClauseExp x -> analyze_cond x
+  | CondArrow (test, conseq, alt) ->
+      let pcond = analyzeExp test
+      and pcon = analyzeExp conseq
+      and palt = analyzeExp alt in
+      fun env ->
+        (match pcond env with
+           BoolV false -> palt env
+         | e -> eval_apply (pcon env) [e]
+        )
+  | CondVal (test, alt) ->
+     let pcond = analyzeExp test
+     and palt = analyzeExp alt in
+     fun env ->
+       (match pcond env with
+        | BoolV false -> palt env | e -> e)
   | SetExp (id, exp) ->
      let e = analyzeExp exp in
      fun env ->
@@ -177,22 +191,6 @@ let rec analyzeExp  : exp -> 'a proctype = function
        ) in
      loop (List.map (fun p -> p env) inits)
 
-and analyze_cond = function
-    ARROW (cond, conseq, alt) ->
-      let pcond = analyzeExp cond
-      and pcon = analyzeExp conseq
-      and palt = analyzeExp alt in
-      fun env ->
-        (match pcond env with
-           BoolV false -> palt env
-         | e -> eval_apply (pcon env) [e]
-        )
-  | VAL (cond, alt) ->
-     let pcond = analyzeExp cond
-     and palt = analyzeExp alt in
-     fun env ->
-       (match pcond env with
-        | BoolV false -> palt env | e -> e)
 
 (* unused  *)
 and analyze_seq exps =

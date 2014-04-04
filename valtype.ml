@@ -90,12 +90,6 @@ let extendletrec eval (env : 'a env) binds  =
   newenv
 
 
-let rec evalSelf = function
-  | Syntax.Int x -> IntV x
-  | Syntax.Bool x -> BoolV x
-  | Syntax.Char x -> CharV x
-  | Syntax.String x -> StringV x
-
 
 let rec evalQuote = function
     Syntax.Id s -> SymbolV s
@@ -103,6 +97,7 @@ let rec evalQuote = function
   | Syntax.Bool x -> BoolV x
   | Syntax.Char x -> CharV x
   | Syntax.String x -> StringV x
+  | Syntax.Vector x -> VectorV (Array.map evalQuote (Array.of_list x))
   | Syntax.List x ->
       List.fold_right (fun x y -> PairV (ref (evalQuote x), ref y)) x EmptyListV
 (*
@@ -113,15 +108,26 @@ let rec evalQuote = function
  *)
   | Syntax.Cons (x, y) ->
      PairV (ref (evalQuote x), ref (evalQuote y))
+
+let evalSelf = evalQuote
+(*
+let rec evalSelf = function
+  | Syntax.Int x -> IntV x
+  | Syntax.Bool x -> BoolV x
+  | Syntax.Char x -> CharV x
+  | Syntax.String x -> StringV x
   | Syntax.Vector x -> VectorV (Array.map evalQuote (Array.of_list x))
+ *)
+
 
 let rec val_to_sexp = function
     IntV x -> Syntax.Int x
   | BoolV x -> Syntax.Bool x
   | CharV x -> Syntax.Char x
   | StringV x -> Syntax.String x
-  | EmptyListV -> Syntax.List []
   | SymbolV x -> Syntax.Id x
+  | VectorV x -> Syntax.Vector (List.map val_to_sexp (Array.to_list x))
+  | EmptyListV -> Syntax.List []
   | PairV (x, y) ->
      (match val_to_sexp !y with
         Syntax.List a -> Syntax.List (val_to_sexp !x :: a)

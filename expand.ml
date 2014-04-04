@@ -76,7 +76,16 @@ let rec expandExp env = function
       and bin = List.map (fun (id, e) -> (id, expandExp env e)) binds in
       LetrecExp (bin, expandExp a exp)
 
+  | CondArrow (test, ret, alt) ->
+     CondArrow (expandExp env test,
+                           expandExp env ret,
+                           expandExp env alt)
+  | CondVal (test, alt) ->
+     CondVal (expandExp env test,
+                         expandExp env alt)
+(*
   | CondClauseExp x -> expand_cond env x
+ *)
 (*
   | SetExp (id, exp) ->
       let a = lookup id env in
@@ -94,7 +103,7 @@ let rec expandExp env = function
 
   | x -> x
 
-
+(*
 and expand_cond env = function
     ARROW (cond, ret, alt) ->
      CondClauseExp (ARROW (expandExp env cond,
@@ -103,3 +112,4 @@ and expand_cond env = function
   | VAL (cond, alt) ->
      CondClauseExp (VAL (expandExp env cond,
                          expandExp env alt))
+ *)
