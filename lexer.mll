@@ -17,7 +17,10 @@ rule main = parse
 |  [' ' '\009' '\012' '\r' '\n']+   { main lexbuf }
 
 
+| '"'      { string_lit (Buffer.create 100) lexbuf }
+(*
 | '"' [^ '"']* '"' { Sparser.STRINGV (Lexing.lexeme lexbuf) }
+ *)
 
 | '-'? ['0'-'9']+
     { Sparser.INTV (int_of_string (Lexing.lexeme lexbuf)) }
@@ -54,3 +57,20 @@ rule main = parse
       in
       failwith message
     }
+
+and string_lit buf = parse
+
+  | '"'       { Sparser.STRINGV (Buffer.contents buf) }
+  | '\\' '\\' { Buffer.add_char buf '\\'; string_lit buf lexbuf }
+  | '\\' 'a'  { Buffer.add_char buf '\007'; string_lit buf lexbuf }
+  | '\\' 'b'  { Buffer.add_char buf '\b'; string_lit buf lexbuf }
+  | '\\' 't'  { Buffer.add_char buf '\t'; string_lit buf lexbuf }
+  | '\\' 'n'  { Buffer.add_char buf '\n'; string_lit buf lexbuf }
+  | '\\' 'r'  { Buffer.add_char buf '\r'; string_lit buf lexbuf }
+  | '\\' '"'  { Buffer.add_char buf '"'; string_lit buf lexbuf }
+  | '\\' '|'  { Buffer.add_char buf '|'; string_lit buf lexbuf }
+  | [^ '"' '\\']+
+    { Buffer.add_string buf (Lexing.lexeme lexbuf);
+      string_lit buf lexbuf
+    }
+
