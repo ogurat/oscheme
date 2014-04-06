@@ -13,7 +13,7 @@ let rec printval = function
   | BoolV x ->  (if x then "#t" else "#f")
   | CharV x -> String.make 1 x
   | SymbolV x -> (x)
-  | StringV x ->  x (* "\"" ^ x ^ "\"" *)
+  | StringV x -> x (* "\"" ^ x ^ "\"" *)
   | VectorV x ->
      let rec loop n = 
        if n = Array.length x then
@@ -76,53 +76,82 @@ let read () =
   let sexp = Sparser.sexpdata Lexer.main buf in
      evalQuote sexp
 
-let chareq a b = BoolV (a = b)
+let chareqp a b =
+  match (a, b) with
+    (CharV x, CharV y) -> x = y
+  | _  -> false
+
+let symboleqp a b =
+  match (a, b) with
+    (SymbolV x, SymbolV y) -> x = y
+  | _  -> false
 
 let eqp x y =
   match (x, y) with
-  | (BoolV true, BoolV true) 
-  | (BoolV false, BoolV false) ->  true
-  | (SymbolV s1, SymbolV s2) -> s1 = s2
-  | (EmptyListV, EmptyListV) ->  true
-  | StringV a, StringV b -> a == b
-(*  | VectorV a, VectorV b -> a == b *)
+  | (BoolV true, BoolV true) | (BoolV false, BoolV false) ->  true
+  | (SymbolV _, SymbolV _) -> symboleqp x y
+  | (EmptyListV, EmptyListV) -> true
+  | PairV _ , PairV _  -> x == y
+  | StringV a, StringV b -> x == y
+  | VectorV a, VectorV b -> x == y
+(* also bytevector, record  *)
   | _ ->  false
 
 let eqvp x y =
   match (x, y) with
   | a,b when (eqp a b) -> true
   | (IntV x, IntV y) -> x = y
-  | (CharV c, CharV d) -> c = d
+  | (CharV _, CharV _) -> chareqp x y
   | _ ->  false
 
 let rec equalp x y =
   match (x, y) with
   | a,b when (eqvp a b) ->  true
   | PairV (a, b), PairV (c, d) -> (equalp !a !c) && (equalp !b !d)
-(*  | VectorV a, VectorV b -> false *)
+  | StringV x, StringV y -> x = y
+  | VectorV x, VectorV y -> x = y (* todo: recursive *)
   | _ ->  false
 
 
 
+let add_ ls =
+  let c =List.fold_left (fun x y ->
+                         match y with
+                           IntV y -> x + y
+                          | _ -> failwith "Arity mismatch: +")
+                        0 ls
+  in IntV c
+
 let add ls =
-  let rec apply = function
-    | [IntV i] -> i
-    | IntV a :: tl -> a + apply tl 
+  let rec apply result = function
+    | [] -> result
+    | IntV a :: tl -> apply (a + result) tl 
     | _ -> failwith "Arity mismatch: +"
-  in IntV (apply ls);;
+  in IntV (apply 0 ls);;
 
 let multi ls = 
-  let rec apply = function
-    | [IntV i] -> i
-    | IntV a :: tl -> a * apply tl 
+  let rec apply result = function
+    | [] -> result
+    | IntV a :: tl -> apply (a * result) tl 
     | _ -> failwith "Arity mismatch: *"
-  in IntV (apply ls)
+  in IntV (apply 1 ls)
 
 let minus ls =
   let rec apply = function
     | [IntV i; IntV j] -> i - j
     | _ -> failwith "Arity mismatch: -"
   in IntV (apply ls)
+
+let comp op ls =
+  let rec loop = function
+      [IntV a; IntV b] -> op a b
+    | IntV a :: rest ->
+       (match rest with
+          IntV b :: _ ->  op a b && loop rest
+        | _ ->  failwith "comp"
+       )
+    | _ -> failwith "comp"     
+  in BoolV (loop ls)
 
 let booleanp = function
     BoolV _ ->  true
@@ -163,11 +192,11 @@ let cons a b =
 
 let car = function
     PairV (x, _) -> !x
-  | _ -> failwith "Arity mismatch: car"
+  | _ -> failwith "Arity mismatch: car not pair"
 
 let cdr = function 
     PairV (_, x) -> !x
-  | _ -> failwith "Arity mismatch: cdr"
+  | x -> failwith ("Arity mismatch: cdr not pair " ^ (printval x))
 
 let setcar v = function
     PairV (a, _) -> a := v; UnitV
@@ -324,7 +353,8 @@ let apply proc args =
 and map1 proc l =
   let rec impl = function
     | EmptyListV -> EmptyListV
-    | x -> cons (apply proc [car x]) (impl (cdr x))
+    | PairV (x, rest) -> cons (apply proc [!x]) (impl (!rest))
+    | _ -> failwith "Arity mismatch: map  not pair"
   in impl l
 
 and map2 proc l1 l2 =
@@ -405,18 +435,30 @@ in
   ("equal?", function
        [x;y] -> BoolV (equalp x y)
      | _ -> failwith "Arity mismatch: equal?");
+  ("=", comp (=));
+  ("<", comp (<));
+  (">", comp (>));
+  ("<=", comp (<=));
+  (">=", comp (>=));
+
+(*
   ("=", function
        [x;y] -> BoolV (eq x y)
      | _ -> failwith "Arity mismatch: =");
+
   ("<",  function
     | [IntV i; IntV j] -> BoolV (i < j)
     | _ -> failwith "Arity mismatch: <");
   (">",  function
     | [IntV i; IntV j] -> BoolV (i > j)
     | _ -> failwith "Arity mismatch: >");
+  ("<=", function
+    | [IntV i; IntV j] -> BoolV (i <= j)
+    | _ -> failwith "Arity mismatch: <=");
   (">=", function
     | [IntV i; IntV j] -> BoolV (i >= j)
     | _ -> failwith "Arity mismatch: >=");
+ *)
   ("positive?", function
      [IntV x] -> BoolV (x > 0)
    | _ -> failwith "Arity mismatch: positive?");
@@ -454,6 +496,9 @@ in
   ("cddr", function
      | [x] -> cdr (cdr x)
      | _ -> failwith "Arity mismatch: cddr");
+  ("caaar", function
+       [x] -> car (car (car x))
+     | _ -> failwith "Arity mismatch: caaar");
   ("caadr", function
        [x] -> car (car (cdr x))
      | _ -> failwith "Arity mismatch: caadr");
@@ -463,15 +508,48 @@ in
   ("caddr", function
        [x] -> car (cdr (cdr x))
      | _ -> failwith "Arity mismatch: caddr");
-  ("cdddr", function
-       [x] -> cdr (cdr (cdr x))
-     | _ -> failwith "Arity mismatch: cdddr");
+  ("cdaar", function
+       [x] -> cdr (car (car x))
+     | _ -> failwith "Arity mismatch: cdaar");
   ("cdadr", function
        [x] -> cdr (car (cdr x))
      | _ -> failwith "Arity mismatch: cdadr");
+  ("cddar", function
+       [x] -> cdr (cdr (car x))
+     | _ -> failwith "Arity mismatch: cddar");
+  ("cdddr", function
+       [x] -> cdr (cdr (cdr x))
+     | _ -> failwith "Arity mismatch: cdddr");
+  ("caaaar",function
+       [x] -> car (car (car (car x)))
+     | _ -> failwith "Arity mismatch: caaaar");
+  ("caaadr",function
+       [x] -> car (car (car (cdr x)))
+     | _ -> failwith "Arity mismatch: caaadr");
+  ("caadar",function
+       [x] -> car (car (cdr (car x)))
+     | _ -> failwith "Arity mismatch: caadar");
+  ("caaddr",function
+       [x] -> car (car (cdr (cdr x)))
+     | _ -> failwith "Arity mismatch: caaddr");
+  ("cadaar",function
+       [x] -> car (cdr (car (car x)))
+     | _ -> failwith "Arity mismatch: cadaar");
+  ("cadadr",function
+       [x] -> car (cdr (car (cdr x)))
+     | _ -> failwith "Arity mismatch: cadadr");
+  ("caddar",function
+       [x] -> car (cdr (cdr (car x)))
+     | _ -> failwith "Arity mismatch: cadaar");
   ("cadddr",function
        [x] -> car (cdr (cdr (cdr x)))
      | _ -> failwith "Arity mismatch: cadddr");
+  ("cdaaar",function
+       [x] -> cdr (car (car (car x)))
+     | _ -> failwith "Arity mismatch: cdaaar");
+  ("cdaadr",function
+       [x] -> cdr (car (car (cdr x)))
+     | _ -> failwith "Arity mismatch: caaaar");
   ("null?", function
        [x] -> BoolV (nullp x)
      | _ -> failwith "Arity mismatch: null?");
@@ -562,7 +640,7 @@ in
    | _ -> failwith "Arity mismatch: number->sting");
 
   ("char=?", function
-     [CharV x1; CharV x2] -> BoolV (x1 = x2)
+     [x1; x2] -> BoolV (chareqp x1 x2)
    | _ -> failwith "Arity mismatch: char=?");
 
   ("vector?", function
@@ -572,6 +650,9 @@ in
      [VectorV x] -> IntV (Array.length x)
    | _ -> failwith  "Arity mismatch: vector-length");
   ("vector", makevector);
+  ("make-vector", function
+     [IntV k; x] -> VectorV (Array.make k x)
+   | _ ->  failwith  "Arity mismatch: make-vector");
   ("vector->list", function
      [x] -> vec_to_list x
    | _  -> failwith "Arity mismatch: vector->list");
@@ -582,6 +663,9 @@ in
   ("symbol?", function
      [x] -> BoolV (symbolp x)
    | _ -> failwith "Arity mismatch: symbol?");
+  ("symbol=?", function
+     [x; y] -> BoolV (symboleqp x y)
+   | _ -> failwith "Arity mismatch: symbol=?");
   ("symbol->string", function
      [SymbolV x] -> StringV x
    | _ -> failwith "Arity mismatch: symbol->sting");
