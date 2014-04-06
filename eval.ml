@@ -58,7 +58,7 @@ let rec evalExp env = function
         | a :: rest ->
             (match result with
                BoolV false -> loop (evalExp env a) rest
-             | e -> e
+             | _ -> result
             )
       in loop (BoolV false) ls
 

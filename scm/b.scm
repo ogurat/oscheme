@@ -215,9 +215,9 @@
 
 
 (define (testand)
-  (list (list (and 1) (and 1 2) (and 5 6 (eqv? 5 5)) (and 8 (eqv? 5 6) 10))
-  ; (display (list (an> 1) (an> 1 2) (an> 5 6 (eqv? 5 5)) (an> 8 (eqv? 5 6) 10)))
-  (list (or 1) (or 1 2) (or 5 6 (eqv? 5 5))  (or (eqv? 5 6) (+ 2 5)) (or (eqv? 5 5) 10)))
+  (list
+   (list (and 1) (and 1 2) (and 5 6 (eqv? 5 5)) (and 8 (eqv? 5 6) 'a 10))
+   (list (or 1) (or 1 2) (or 5 6 (eqv? 5 5)) (or (eqv? 5 6) (+ 2 5)) (or (eqv? 5 5) 'a 10)))
   )
 
 (define (testdata)
@@ -245,26 +245,42 @@
  ;       (#f 'last))
   ))
 
+(define (condtest2 x s)
+  (list
+   (cond ((eqv? x 1) 'first)
+         ((eqv? x 2) 'second))
+   (cond ((eqv? x 1))
+         ((eqv? x 2)))
+   (cond (#f 'first)
+         ((assoc s '((a 1) (b 2))) => cadr))
+   (cond (#f 'first)
+         ((assoc s '((a 1) (b 2)))))
+))
+  
+
 (define (casetest x)
-  (case x
-    ((2 3 5 7) 'prime)
-    ((1 4 6 8 9) 'second)
-    (else 'else)))
+  (list
+   (case x
+     ((2 3 5 7) 'prime)
+     ((1 4 6 8 9) 'composit)
+     (else 'else))
+   (case (* 2 3)
+     ((2 3 5 7) 'prime)
+     ((1 4 6 8 9) 'composit))  
+   #;(case 2
+     ((2 3 5 7) => square)
+     ((1 4 6 8 9) 'second))
+   #;(case 'a
+     ((a b c d) => (lambda (x) (cons x 'd)))
+     ((e f g) 'second))))
 
-(define (casetest2)
-  (case (* 2 3)
-    ((2 3 5 7) 'prime)
-    ((1 4 6 8 9) 'second)))
-
-#;(define (casetest3)
-  (case 2
-    ((2 3 5 7) => square)
-    ((1 4 6 8 9) 'second)))
-
-#;(define (casetest4)
-  (case 'a
-    ((a b c d) => (lambda (x) (cons x 'd)))
-    ((e f g) 'second)))
+(define (casetest2 x y z)
+  (define (f x)
+    (case (car x)
+      ((a s d) 'first)
+      ((f g h) 'second)
+      (else 'else)))
+  (list (f x) (f y) (f z)))
 
 
 (define (a1 x)
@@ -314,6 +330,7 @@
 (define (maptest)
   (list
    (map square '(3 4 5))
+   (map + '(1 5 6) '(4 5 10))
    (map + '(2 3 4 ) '(4 5 6) '(7 8 9) '(10 11 12))
    (map list '(a s d) '(x y z) '(1 2 3 4 5) '(asd fgh jkl))))
 

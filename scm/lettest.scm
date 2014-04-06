@@ -59,10 +59,13 @@
   (let ((a (* x x)) (b (+ y y)) (c 5))
     (list a b c)))
 
-(define (letlist2 x)
-  (let* ((a (* x x)) (b (+ a a)) (c (+ a b)))
+(define (letlist2 x y)
+  (let* ((a (* x x)) (b (+ y y)) (c (+ a b)))
     (list a b c)))
 
+(define (letstar)
+  (let* ((x 7) (z (+ x 3)))
+    (* z x)))
 
 (define (plus x y) (+ x y))
 (define (times x y) (* x y))
@@ -111,7 +114,7 @@
   (display (let ((a 10) (b 20)) (plus a b)))
   (display (mapsquare '(1 2 3)))
   (display (letlist 3 4))
-  (display (letlist2 3))
+  (display (letlist2 3 4))
   (display (setxy 5 8) )
   (display (fact2 5)))
 

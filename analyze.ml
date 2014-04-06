@@ -84,7 +84,8 @@ let rec analyzeExp  : exp -> 'a proctype = function
           [] -> result
         | p :: rest ->
             (match result with
-              BoolV false -> loop (p env) rest | e -> e
+               BoolV false -> loop (p env) rest
+             | _ -> result
             ) in
       loop (BoolV false) args
 

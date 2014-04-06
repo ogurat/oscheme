@@ -350,8 +350,10 @@ and parseClauses' = function
           raise (ParseError "else clause is not last")
       | [test; Id "=>"; fn],_  ->
           CondArrow (parseExp test, parseExp fn, parseClauses' rest)
+(*
       | test :: [],         [] ->
           parseExp test
+ *)
       | test :: [],         _  ->
           CondVal (parseExp test, parseClauses' rest)
       | test :: body,       _  ->

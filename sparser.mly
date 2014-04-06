@@ -31,8 +31,8 @@ toplevel :
 */
 Sexp :
     INTV { Int $1 }
-  | CHARV { Char $1 }
   | BOOLV { Bool $1 }
+  | CHARV { Char $1 }
   | ID { Id $1 }
   | STRINGV { String $1 }
   | LPAREN Sexplist RPAREN { List $2 }
