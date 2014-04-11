@@ -14,6 +14,7 @@ type 'a v =
   | Exc of exn
 
 
+
 let bcase = ("scm/b.scm", [
 
 
@@ -49,14 +50,22 @@ let bcase = ("scm/b.scm", [
 ("(cons 'a 'b)", Ex "'(a . b)");
 
 ("(xtest 3 8)", Ex "'(24 9 64)");
-("(condtest 1 'b)", Ex "'(first  (edf ghi) 2 (b 2) (y z) xyz)");
-("(condtest 2 'c)", Ex "'(second  (edf ghi) else2 else3 (y z) xyz)");
-("(casetest 6)", Ex "'(composit composit)" ) ;
-("(casetest 10)", Ex "'(else composit)" ) ;
-("(casetest2 '(s d) '(h i) '(i a))" , Ex "'(first second else)") ;
+("(cond1 1 'b)", Ex "'(first  (edf ghi) 2 (b 2) (y z) xyz)");
+("(cond1 2 'c)", Ex "'(second  (edf ghi) else else (y z) xyz)");
+("(cond2 1 'b)", Ex "'(first #t 2 (b 2))") ;
+(*
+let te =  V (PairV ( ref (BoolV true), ref (PairV (  ref UnitV, ref (PairV ( ref UnitV, ref EmptyListV  ))))))
+ *)
 
-("(maptest)", Ex "'((9 16 25) (5 10 16) (23 27 31) ((a x 1 asd) (s y 2 fgh) (d z 3 jkl)))" ) ;
+("(case1 6)", Ex "'(composit composit)" ) ;
+("(case1 10)", Ex "'(else composit)" ) ;
+("(case2)", Ex "'(first second else)" ) ;
+
+("a10",   V (StringV "\basd\007\r\n\t\"\\asd")) ;
+
 ])
+
+
 
 let lettestcase = ("scm/lettest.scm", [
 
@@ -156,21 +165,43 @@ let qq = ("scm/quasiquote.scm", [
 
            ])
 
+let lib = ("scm/libtest.scm", [
+"(a1 '(a b c d) 2)", Ex "'((c d) c)" ;
+"(a2 '(a b c d) 'c)", Ex "'((c d) (c d) (c d))" ;
+"(a2 '(1 2 3) 2)", Ex "'(#f (2 3) (2 3))" ;
+"(a3 '((a 1) (b 2) (c 3)) 'c)", Ex "'((c 3) (c 3) (c 3))" ; 
+
+
+"(maptest)", Ex "'((9 16 25) (5 10 16) (23 27 31) ((a x 1 asd) (s y 2 fgh) (d z 3 jkl)))" ;
+"(a4 '(1 2 3 4))", Ex "'(10 10 (4 3 2 1))" ;
+
+"(a5 \"abcdefg\" 4)", Ex "'(#t 7 #\\e)" ; 
+
+
+            ] )
+
 let macro = ("scm/mlib.scm", [
+
+"(let1)", Ex "3" ;
+"(let2)", Ex "'asd" ;
+"(let3)", Ex "'asd" ;
 
 "(aa 2 5)", Ex "'10" ;
 
+"(cond0 3 'c)", Ex "'else" ;
 "(dotest '(1 2 3 4) 'c)", Ex "'(10 c)" ;
 
-("(condtest 1 'b)", Ex "'(first (b 2) else4)");
-("(condtest 2 'c)", Ex "'(second else3 else4)");
-("(condtest 3 'b)", Ex "'(else (b 2) else4)");
+"(cond1 1 'b)", Ex "'(first (b 2) else)" ;
+"(cond1 2 'c)", Ex "'(second else else)" ;
+"(cond1 3 'b)", Ex "'(else (b 2) else)" ;
+
+"(case1 2)", Ex "'(prime composit first second else)" ;
 
 	       ])
 
 let al = ("scm/alexpander.scm", [
 
-"(alexpander-repl)", Ex "'()"
+"(expand-program '((or a b c)))", Ex "'()"
 
 	       ])
 
@@ -208,6 +239,11 @@ let  eeval s =
   (* let envv = Analyze.extendletrec primis [] in *)
     Eval.evalExp primis x
 
+let  expand s =
+  let x = parse s 
+    and primis = ge Eval.eval_apply in
+  (* let envv = Analyze.extendletrec primis [] in *)
+    Expand.expandExp primis x
 
 
 let withfile proc name =
@@ -306,8 +342,7 @@ let show_exp (file, _) =
 let def_exp name =
   List.assoc name
 
-
-let expand (file, _) =
+let show_expand (file, _) =
   let primis = ge Eval.eval_apply
   and (defs, _) = Parser.parseDefs (sexps_from file) in
   let env = Eval.extendletrec primis defs in

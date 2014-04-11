@@ -109,12 +109,13 @@
 
 ;;; マクロ
 
-(define-macro let
+(define-macro llet
   (lambda (args . body)
-    (if (pair? args)
+    (if (list? args)
+    ;(if (pair? args)
         `((lambda ,(map car args) ,@body) ,@(map cadr args))
       ; named-let
-      `(letrec ((,args (lambda ,(map car (car body)) ,@(cdr body))))
+      `(lletrec ((,args (lambda ,(map car (car body)) ,@(cdr body))))
         (,args ,@(map cadr (car body)))))))
 
 (define-macro aand
@@ -133,22 +134,22 @@
         #f
       (if (null? (cdr args))
           (car args)
-          `(let ((value+ ,(car args)))
-             (if value+
-                 value+
+          `(llet ((+value+ ,(car args)))
+             (if +value+
+                 +value+
                  (oor ,@(cdr args))))))))
 
-(define-macro let*
+(define-macro llet*
   (lambda (args . body) 
     (if (null? (cdr args))
-        `(let (,(car args)) ,@body)
-        `(let (,(car args)) (let* ,(cdr args) ,@body)))))
+        `(llet (,(car args)) ,@body)
+        `(llet (,(car args)) (llet* ,(cdr args) ,@body)))))
 
-#;(define-macro letrec
+(define-macro lletrec
   (lambda (args . body)
-    (let ((vars (map car args))
-          (vals (map cadr args)))
-      `(let ,(map (lambda (x) `(,x '*undef*)) vars)
+    (llet ((vars (map car args))
+           (vals (map cadr args)))
+      `(llet ,(map (lambda (x) `(,x '*undef*)) vars)
             ,@(map-2 (lambda (x y) `(set! ,x ,y)) vars vals)
             ,@body))))
 
@@ -168,21 +169,21 @@
       (if (eq? (caar args) 'else)
           `(bbegin ,@(cdar args))
           (if (null? (cdar args))
-              `(let ((value+ ,(caar args)))
-                 (if value+ value+ (ccond ,@(cdr args))))
+              `(llet ((+value+ ,(caar args)))
+                 (if +value+ +value+ (ccond ,@(cdr args))))
               `(if ,(caar args)
                    (bbegin ,@(cdar args))
                    (ccond ,@(cdr args))))))))
 
-(define-macro case
+(define-macro ccase
   (lambda (key . args)
     (if (null? args)
         '*undef*
       (if (eq? (caar args) 'else)
-          `(begin ,@(cdar args))
+          `(bbegin ,@(cdar args))
           `(if (memv ,key ',(caar args))
-               (begin ,@(cdar args))
-               (case ,key ,@(cdr args)))))))
+               (bbegin ,@(cdar args))
+               (ccase ,key ,@(cdr args)))))))
 
 (define-macro ddo
   (lambda (var-form test-form . args)
@@ -191,10 +192,10 @@
         (if (null? xs)
             '()
             (cons (fn (car xs) (car ys)) (map-2 fn (cdr xs) (cdr ys))))))
-    (let ((vars (map car var-form))
-          (vals (map cadr var-form))
-          (step (map cddr var-form)))
-      `(letrec ((loop 
+    (llet ((vars (map car var-form))
+           (vals (map cadr var-form))
+           (step (map cddr var-form)))
+      `(lletrec ((loop 
                  (lambda ,vars
                    (if ,(car test-form)
                        (bbegin ,@(cdr test-form))
@@ -207,21 +208,17 @@
          (loop ,@vals)))))
 
 
-
-(define-macro (aaa x y z)
-  (define (sq x) (* x x))
-  `(and x y z))
-
-(define-macro bbb
-  (lambda (x y z)
-    (define (sq x) (* x x))
-    `(a b c)))
-
+(define (let1)
+  (llet ((x 1) (y 2)) (+ x y)))
+(define (let2)
+  (llet () 'asd))
+(define (let3)
+  (llet () 'a 'b 'asd))
 
 (define (aa x y)
   (aand 'a 'b (+ x y) (* x y)))
 
-(define (cond1 x s)
+(define (cond0 x s)
   (ccond ((eqv? x 1) 'a 'first)
          ((eqv? x 2) 'b 'second)
          ((assoc s '((a 1) (b 2))))
@@ -239,19 +236,36 @@
       ((= x 5) 'a 'b y)))
   (list (f1) (f2)))
 
-(define (condtest x s)
+(define (cond1 x s)
  (list
   (ccond ((eqv? x 1) 'a 'first)
          ((eqv? x 2) 'b 'second)
          (else 'else))
   #;(ccond ('(abc edf ghi) => cdr)
-           (else 'else2))
+           (else 'else))
   #;(ccond ((assoc s '((a 1) (b 2))) => cadr)
-           (else 'else2))
+           (else 'else))
   (ccond ((assoc s '((a 1) (b 2))))
-         (else 'else3))
+         (else 'else))
   (ccond (#f 'first)
-        (else 'else4))
+        (else 'else))
   #;(let ((temp 'xyz))
     (ccond ('(abc edf ghi) => (lambda (y) temp))))
   ))
+
+(define (case1 x)
+  (define (f x)
+    (case (car x)
+      ((a s d) 'first)
+      ((f g h) 'second)
+      (else 'else)))
+  (list
+   (ccase x
+     ((2 3 5 7) 'prime)
+     ((1 4 6 8 9) 'composit)
+     (else 'else))
+   (ccase (* 2 3)
+     ((2 3 5 7) 'prime)
+     ((1 4 6 8 9) 'composit))
+   (f '(s d)) (f '(h i)) (f '(i a))))
+

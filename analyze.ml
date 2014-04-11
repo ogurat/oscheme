@@ -164,7 +164,9 @@ let rec analyzeExp  : exp -> 'a proctype = function
      and palt = analyzeExp alt in
      fun env ->
        (match pcond env with
-        | BoolV false -> palt env | e -> e)
+          BoolV false -> palt env
+        | e -> e
+       )
   | SetExp (id, exp) ->
      let e = analyzeExp exp in
      fun env ->

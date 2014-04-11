@@ -1,8 +1,10 @@
 
 
 (define (a1 x y)
-  (+ x y)
-  (* x y))
+  (define (add x y) (+ x y))
+  (define (multi x y) (* x y))
+  (add x y)
+  (multi x y))
 
 (define a2
   (lambda (x y)

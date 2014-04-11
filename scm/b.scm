@@ -223,20 +223,20 @@
 (define (testdata)
   (list 'true 'bb '(a b c) '(+ 1 2) (car '(a b c)) '() '(quote a) ))
 
-(define (condtest x s)
+(define (cond1 x s)
  (list
   (cond ((eqv? x 1) 'first)
         ((eqv? x 2) 'second)
         (else 'else))
   (cond ('(abc edf ghi) => cdr)
-        (else 'else2))
+        (else 'else))
   (cond ((assoc s '((a 1) (b 2))) => cadr)
-        (else 'else2))
+        (else 'else))
   (cond ((assoc s '((a 1) (b 2))))
-        (else 'else3))
+        (else 'else))
   (cond (#f 'first)
         ('(x y z) => cdr)
-        (else 'else4))
+        (else 'else))
   (let ((temp 'xyz))
     (cond ('(abc edf ghi) => (lambda (x) temp))))
 
@@ -245,20 +245,17 @@
  ;       (#f 'last))
   ))
 
-(define (condtest2 x s)
+(define (cond2 x s)
   (list
-   (cond ((eqv? x 1) 'first)
-         ((eqv? x 2) 'second))
    (cond ((eqv? x 1))
          ((eqv? x 2)))
    (cond (#f 'first)
          ((assoc s '((a 1) (b 2))) => cadr))
    (cond (#f 'first)
-         ((assoc s '((a 1) (b 2)))))
-))
+         ((assoc s '((a 1) (b 2)))))))
   
 
-(define (casetest x)
+(define (case1 x)
   (list
    (case x
      ((2 3 5 7) 'prime)
@@ -274,13 +271,13 @@
      ((a b c d) => (lambda (x) (cons x 'd)))
      ((e f g) 'second))))
 
-(define (casetest2 x y z)
+(define (case2)
   (define (f x)
     (case (car x)
       ((a s d) 'first)
       ((f g h) 'second)
       (else 'else)))
-  (list (f x) (f y) (f z)))
+  (list (f '(s d)) (f '(h i)) (f '(i a))))
 
 
 (define (a1 x)
@@ -334,6 +331,8 @@
    (map + '(2 3 4 ) '(4 5 6) '(7 8 9) '(10 11 12))
    (map list '(a s d) '(x y z) '(1 2 3 4 5) '(asd fgh jkl))))
 
+(define a10 "\basd\a\r\n\t\"\\asd")
+
 
 (begin
   (display (dotest '(1 2 3 4) 'c))
@@ -352,8 +351,8 @@
   (display (xtestt 3 8))
   (display ((aaa 7 6)))
   (display (testand))
-  (display (condtest 1 'b))
-  (display (condtest 2 'c))
+  (display (cond1 1 'b))
+  (display (cond1 2 'c))
   (testdata)
   )
 
