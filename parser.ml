@@ -162,6 +162,13 @@ and parseForm : sexp list -> exp = function
         | x :: rest ->
            IfExp (parseExp x, make rest, SelfEvalExp (Bool false)) in
       make rest
+  | Id "or" :: rest ->
+      let rec make = function
+          [] -> SelfEvalExp (Bool false)
+        | [x] -> parseExp x
+        | x :: rest ->
+           CondVal (parseExp x, make rest) in
+      make rest
   | Id "and_" :: rest -> (* derived s expression  *)
      (match rest with
 	[] -> SelfEvalExp (Bool true)
@@ -172,7 +179,7 @@ and parseForm : sexp list -> exp = function
            parseExp a
      )
   | Id "and__" :: rest -> AndExp (parseExplist rest)
-  | Id "or" :: rest -> OrExp (parseExplist rest)
+  | Id "or__" :: rest -> OrExp (parseExplist rest)
   | Id "lambda" :: rest ->
      let (ids, varid, exp) = parseLambda rest in
      LambdaExp (ids, varid,exp)
@@ -214,7 +221,7 @@ and parseForm : sexp list -> exp = function
       )
   | op :: rest ->
      (match op with
-     | Id "aand" | Id "and2" | Id "oor" | Id "ccond" | Id "ddo" | Id "bbegin" ->
+        | Id "llet" | Id "aand" | Id "oor" | Id "ccond" | Id "ddo" | Id "bbegin" | Id "ccase" | Id "llet*" | Id "lletrec" ->
         let (Id var) = op in
         (* let a = List.map (fun e -> QuoteExp e) rest in *)
         MacroAppExp (var, rest)
@@ -271,14 +278,13 @@ and parseLet_ = function
 
 and parseLetstar = function
   | List binds :: body ->
-     let a =
+     parseExp
        (match binds with
           [] -> List (Id "let" :: List [] :: body)
         | List [name; value] :: rest ->
            List [Id "let"; List [List [name; value]]; List (Id "let*" :: List rest :: body)]
         | _ -> raise (ParseError "ler*")
-       ) in
-     parseExp a
+       )
   | _ -> raise (ParseError "let*")
 
 
@@ -364,31 +370,75 @@ and parseClauses' = function
   | _ -> raise (ParseError "cond clause")
 
 
-and parseCase =
-  let rec loop key = function
-      [] ->  UnspecifiedExp
-    | List x :: rest ->
-       (match x with
-          Id "else" :: result ->
-          body_to_exp (List.map parseExp result)
-        | [List _ as atoms; Id "=>"; result] -> 
-           let a = parseExp result 
-           and appmemv = ApplyExp (VarExp "memv", [key; QuoteExp atoms]) in
-           IfExp (appmemv, ApplyExp (a, [key]), loop key rest)
-        | List _ as atoms :: results ->
-           let a = List.map parseExp results 
-           and appmemv = ApplyExp (VarExp "memv", [key; QuoteExp atoms]) in
-           IfExp (appmemv, body_to_exp a, loop key rest)
-        | _ -> raise (ParseError "case") 
-       )
-    | _ -> raise (ParseError "case") in
-  function
-    key :: rest -> loop (parseExp key) rest
-  | _ -> raise (ParseError "case")
+and parseCase' = function (* loop helper が不要 *)
+    [] -> raise (ParseError "case no key")
+  | key :: [] -> raise (ParseError "case no clauses")  
+
+  | List keyargs :: clauses ->
+     let a = List [Id "let";
+                   List [List [Id "key"; List keyargs]];
+                   List (Id "case" :: Id "key" :: clauses)]
+     in parseExp a
+  | key :: List x :: rest ->
+     (match x, rest with
+      | [Id "else"; Id "=>"; result],       [] -> 
+         parseExp (List [result; key])
+      | Id "else" :: results,  [] ->
+         parseExp (List (Id "begin" :: results))
+
+      | [List _ as atoms; Id "=>"; result], _ -> 
+         let appmemv = List [Id "memv"; key; List [Id "quote"; atoms]] in
+         let sexp = List [Id "if"; appmemv;
+                          List [result; key];
+                          List (Id "case" :: key :: rest)] in
+         parseExp sexp
+      | List _ as atoms :: results, _ ->
+         let appmemv = List [Id "memv"; key; List [Id "quote"; atoms]] in
+         let sexp = List [Id "if"; appmemv; 
+                          List (Id "begin" :: results);
+                          List (Id "case" :: key :: rest)] in
+         parseExp sexp
+
+      | _,_ -> raise (ParseError "case 1") 
+     )
+
+and parseCase = function
+    [] -> raise (ParseError "case no key")
+  | key :: [] -> raise (ParseError "case no clauses")
+  | key :: clauses ->
+     match key with
+       List _ ->
+       let a = List [Id "let";
+                     List [List [Id "key"; key]];
+                     List (Id "case" :: Id "key" :: clauses)]
+       in parseExp a
+     | _ ->
+       let key = parseExp key in
+       let rec loop = function
+           [] ->  UnspecifiedExp
+         | List x :: rest ->
+            (match x, rest with
+             | [Id "else"; Id "=>"; result],       [] -> 
+                let a = parseExp result in
+                ApplyExp (a, [key])
+             | Id "else" :: results,                [] ->
+                body_to_exp (List.map parseExp results)
+             | [List _ as atoms; Id "=>"; result], _  -> 
+                let a = parseExp result 
+                and appmemv = ApplyExp (VarExp "memv", [key; QuoteExp atoms]) in
+                IfExp (appmemv, ApplyExp (a, [key]), loop rest)
+             | List _ as atoms :: results,         _ ->
+                let a = List.map parseExp results 
+                and appmemv = ApplyExp (VarExp "memv", [key; QuoteExp atoms]) in
+                IfExp (appmemv, body_to_exp a, loop rest)
+             | _ -> raise (ParseError "case: not else and atoms not list") 
+            )
+         | _ -> raise (ParseError "case clause not list") in
+       loop clauses
 
 
 and parse_qq level : sexp -> qqexp = function
-  | Syntax.List x ->
+  | Syntax.List x | Syntax.Vector x ->
      let rec loop level = function
          [] -> Nil
       | [Syntax.Id "unquote" as u; a] ->
