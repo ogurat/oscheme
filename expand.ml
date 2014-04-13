@@ -50,10 +50,9 @@ let rec expandExp env = function
              | _ -> loop (expandExp env a) rest
             )
       in loop (BoolV true) ls
- *)
   | OrExp ls ->
      OrExp (List.map (expandExp env) ls)
-
+ *)
   | LambdaExp (ids, varid, exp) ->
       LambdaExp (ids, varid, expandExp env exp)
 (*

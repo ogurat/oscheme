@@ -66,6 +66,7 @@ let rec analyzeExp  : exp -> 'a proctype = function
        (match pred env with
         | BoolV false -> alt | _ -> conseq) env
       )
+(*
   | AndExp ls ->
      let args = List.map analyzeExp ls in
      fun env ->
@@ -88,7 +89,7 @@ let rec analyzeExp  : exp -> 'a proctype = function
              | _ -> result
             ) in
       loop (BoolV false) args
-
+ *)
   | LambdaExp (ids, varid, exp) ->
      let proc = analyzeExp exp in
      fun env -> ProcV (ids, varid, proc, env)

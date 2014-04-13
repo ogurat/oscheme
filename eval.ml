@@ -42,7 +42,7 @@ let rec evalExp env = function
   | IfExp (c, a, b) ->
       evalExp env (match evalExp env c with
           BoolV false -> b | _ -> a)
-
+(*
   | AndExp ls ->
       let rec loop result = function
         | [] -> result
@@ -61,7 +61,7 @@ let rec evalExp env = function
              | _ -> result
             )
       in loop (BoolV false) ls
-
+ *)
   | LambdaExp (ids, varid, exp) ->
       ProcV (ids, varid, exp, env)
 

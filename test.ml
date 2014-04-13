@@ -4,7 +4,6 @@
 open Valtype
 open Scheme
 
-open Parser
 open Syntax
 
 
@@ -14,6 +13,7 @@ type 'a v =
   | Exc of exn
 
 
+open Parser
 
 let bcase = ("scm/b.scm", [
 
@@ -52,7 +52,7 @@ let bcase = ("scm/b.scm", [
 ("(xtest 3 8)", Ex "'(24 9 64)");
 ("(cond1 1 'b)", Ex "'(first  (edf ghi) 2 (b 2) (y z) xyz)");
 ("(cond1 2 'c)", Ex "'(second  (edf ghi) else else (y z) xyz)");
-("(cond2 1 'b)", Ex "'(first #t 2 (b 2))") ;
+("(cond2 1 'b)", Ex "'(#t 2 (b 2))") ;
 (*
 let te =  V (PairV ( ref (BoolV true), ref (PairV (  ref UnitV, ref (PairV ( ref UnitV, ref EmptyListV  ))))))
  *)
@@ -63,6 +63,8 @@ let te =  V (PairV ( ref (BoolV true), ref (PairV (  ref UnitV, ref (PairV ( ref
 
 ("a10",   V (StringV "\basd\007\r\n\t\"\\asd")) ;
 
+("(a11)", Ex "'ok" ) ;
+
 ])
 
 
@@ -70,7 +72,7 @@ let te =  V (PairV ( ref (BoolV true), ref (PairV (  ref UnitV, ref (PairV ( ref
 let lettestcase = ("scm/lettest.scm", [
 
 
-("(fibs)",  Ex "'((3 5 2584 4181 6765) (3 5 2584 4181 6765) (3 5 2584 4181 6765) (3 5 2584 4181 6765) (16 25 324 361 400))");
+("(fibs)",  Ex "'((3 5 2584 4181 6765 832040) (3 5 2584 4181 6765 832040) (3 5 2584 4181 6765 832040) (16 25 324 361 400 900))");
 
 ("(mapsquare '(3 4 5))", Ex "'(9 16 25)") ;
 ("(letlist 3 4)", Ex "'(9 8 5)") ;
@@ -165,6 +167,11 @@ let qq = ("scm/quasiquote.scm", [
 
            ])
 
+let syntax = ("scm/syntaxrules.scm", [
+ "(a1 5)", Ex "5"
+
+               ])
+
 let lib = ("scm/libtest.scm", [
 "(a1 '(a b c d) 2)", Ex "'((c d) c)" ;
 "(a2 '(a b c d) 'c)", Ex "'((c d) (c d) (c d))" ;
@@ -173,10 +180,10 @@ let lib = ("scm/libtest.scm", [
 
 
 "(maptest)", Ex "'((9 16 25) (5 10 16) (23 27 31) ((a x 1 asd) (s y 2 fgh) (d z 3 jkl)))" ;
-"(a4 '(1 2 3 4))", Ex "'(10 10 (4 3 2 1))" ;
+(* "(a4 '(1 2 3 4))", Ex "'(10 10 (4 3 2 1))" ; *)
 
 "(a5 \"abcdefg\" 4)", Ex "'(#t 7 #\\e)" ; 
-
+"(a6 '(a s d))", Ex "'(#(a s d) s 3 (a s d))" ;
 
             ] )
 
@@ -199,7 +206,7 @@ let macro = ("scm/mlib.scm", [
 
 	       ])
 
-let al = ("scm/alexpander.scm", [
+let al = ("lib/alexpander.scm", [
 
 "(expand-program '((or a b c)))", Ex "'()"
 
@@ -216,13 +223,14 @@ let parse_err_case = [
 
 let sparse s = 
   Sparser.sexpdata Lexer.main (Lexing.from_string s)
-let sp2 s =
+let sparse_top s =
   Sparser.toplevel Lexer.main (Lexing.from_string s)
 
-
+let parse s = Parser.parseExp (sparse s)
+(*
 let parse s =
   Parser.parseExp (Sparser.sexpdata Lexer.main (Lexing.from_string s))
-
+ *)
 
 let analyze s =
   Analyze.analyzeExp (parse s)
@@ -266,7 +274,9 @@ let interpret name =
 
 let show_sexp (file, _) =
   let es = sexps_from file in
-  List.map (function List [Id "define"; List (Id id :: formals); body] -> (id, body)) es
+  List.map (function 
+               List [Id "define"; List (Id id :: formals); body] -> (id, body)
+              | List [Id "define"; Id id; exp] -> (id, exp)) es
 
 (*
 let def_sexp id es =
@@ -290,7 +300,7 @@ let exec eval env (s, v) = (* v:期待結果 *)
   try 
     let vv = eval (parse s) env 
     and ab = (match v with
-		Ex ex -> eval (parse ex) []
+		Ex ex -> eval (parse ex) [] (* []でいいか? *)
 	      | V v -> v
              ) in
     (match vv with
@@ -307,16 +317,16 @@ let exec eval env (s, v) = (* v:期待結果 *)
       )
 
 
-let exec_expand eval env (var,s) =
-
+let exec_expand env (var,s) =
+ 
     let o = (Expand.expandExp env s) in
     (var, o)
 (*
   with
      Match_failure _ as ex ->
-       Printexc.to_string ex
+       var, ex
    | ex ->
-        Printexc.to_string ex
+       var, ex
  *)
 
 
@@ -339,15 +349,69 @@ let show_exp (file, _) =
   let (defs, _) = Parser.parseDefs (sexps_from file) in
   defs
 
-let def_exp name =
-  List.assoc name
+let def_exp =
+  List.assoc
 
 let show_expand (file, _) =
   let primis = ge Eval.eval_apply
   and (defs, _) = Parser.parseDefs (sexps_from file) in
   let env = Eval.extendletrec primis defs in
- List.map (exec_expand (fun exp en-> Eval.evalExp en exp) env) defs
+ List.map (exec_expand env) defs
 
+let alsparse s =
+  let primis = ge Eval.eval_apply
+  and (defs, _) = Parser.parseDefs (sexps_from "lib/alexpander.scm") in
+  let env = Eval.extendletrec primis defs
+  and sexp = sparse s in
+(*
+  let expandproc = List.assoc "expand-program" env
+  and sexps = Eval.evalExp env (QuoteExp (List sexps)) in
+  let x = Eval.eval_apply !expandproc [sexps] in
+ *)
+  let expandproc = List.assoc "expand-program" defs in
+  let expand = ApplyExp (expandproc, [QuoteExp (List [sexp])]) in
+  let x = Eval.evalExp env expand in
+  val_to_sexp x
+      
+
+let alexpand (file, cases) =
+  let primis = ge Eval.eval_apply
+  and (defs, _) = Parser.parseDefs (sexps_from "lib/alexpander.scm") in
+  let env = Eval.extendletrec primis defs
+  and sexps = sexps_from file
+(*
+  let expandproc = List.assoc "expand-program" env in
+  and sexps = Eval.evalExp env (QuoteExp (List sexps)) in
+  let x = Eval.eval_apply !expandproc [sexps] in
+ *)
+  and expandproc = List.assoc "expand-program" defs in
+  let expand = ApplyExp (expandproc, [QuoteExp (List sexps)]) in
+  let x = Eval.evalExp env expand in
+
+  match val_to_sexp x with 
+    List ss ->
+      let (defs, _) = parseDefs ss in defs
+
+
+let altest (file, cases) =
+  let primis = ge Eval.eval_apply
+  and (defs, _) = Parser.parseDefs (sexps_from "lib/alexpander.scm") in
+  let env = Eval.extendletrec primis defs
+  and sexps = sexps_from file
+(*
+  and expandproc = List.assoc "expand-program" env in
+  and sexps = Eval.evalExp env (QuoteExp (List sexps)) in
+  let x = Eval.eval_apply !expandproc [sexps] in
+ *)
+  and expandproc = List.assoc "expand-program" defs in
+  let expand = ApplyExp (expandproc, [QuoteExp (List sexps)]) in
+  let x = Eval.evalExp env expand in
+
+  match val_to_sexp x with 
+    List ss ->
+      let (defs, _) = parseDefs ss in
+      let env = Eval.extendletrec primis defs in
+      List.map (exec (fun exp en -> Eval.evalExp en exp) env) cases
 
 
 

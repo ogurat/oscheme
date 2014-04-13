@@ -311,6 +311,12 @@ let vec_length = function
 let vec_to_list = function
     VectorV x -> Array.fold_right (fun x y -> PairV (ref x, ref y)) x EmptyListV
   | _ -> failwith "Arity mismatch: vector->list not vector"
+let list_to_vec l =
+  let rec to_list = function
+      EmptyListV -> []
+    | x -> (car x) :: to_list (cdr x)
+  in VectorV (Array.of_list (to_list l))
+
 
 let makevector args =
    VectorV (Array.of_list args)
@@ -639,6 +645,9 @@ in
   ("vector->list", function
      [x] -> vec_to_list x
    | _  -> failwith "Arity mismatch: vector->list");
+  ("list->vector", function
+     [x] -> list_to_vec x
+   | _  -> failwith "Arity mismatch: list->vector");
 
   ("symbol?", function
      [x] -> BoolV (symbolp x)

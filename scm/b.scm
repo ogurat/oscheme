@@ -1,12 +1,4 @@
 
-#;(define (eq? x y)
-  (= x y))
-
-#;(define (eqv? x y)
-  (= x y))
-
-#;(define (equal? x y)
-  (= x y))
 
 (define (dotest x x2)
   (define (f1)
@@ -17,6 +9,9 @@
     (do ((x 0 (+ x 1))
          (y x2))
       ((= x 5) 'a 'b y)))
+  (define (f3)
+    (do ((x 0 (+ x 1)))
+      ((= x 5))))
   (list (f1) (f2)))
 
 (define varf
@@ -91,6 +86,17 @@
   f1)
 
   
+(define (aaa x1 x2)
+  (define (a) (+ x1 x2))
+  (define (b) (* x1 x2))
+  (if (< x1 x2) a b))
+
+(define aaa2
+  (lambda (x1 x2)
+    (define (a) (+ x1 x2))
+    (define (b) (* x1 x2))
+    (if (< x1 x2) a b)))
+
 
 
 (define (fact nn)
@@ -150,48 +156,41 @@
 (define (ev n)
   (letrec
       ((e? (lambda (k)
-                (if (zeroo? k)
-                    (= 1 1)
-                    (o? (- k 1)))))
+             (if (zeroo? k)
+                 #t
+                 (o? (- k 1)))))
        (o? (lambda (j)
-                (if (zeroo? j)
-                    (= 1 0)
-                    (e? (- j 1))))))
+             (if (zeroo? j)
+                 #f
+                 (e? (- j 1))))))
     (e? n)))
 
 (define (ev2 x)
-  (define e? (lambda (n)
-                  (if (zeroo? n)
-                      (= 1 1)
-                      (o? (- n 1)))))
-  (define o? (lambda (n)
-                  (if (zeroo? n)
-                      (= 1 0)
-                      (e? (- n 1)))))
+  (define e?
+    (lambda (n)
+      (if (zeroo? n)
+          #t
+          (o? (- n 1)))))
+  (define o?
+    (lambda (n)
+      (if (zeroo? n)
+          #f
+          (e? (- n 1)))))
   (e? x))
 
-(define (aaa x1 x2)
-  (define (a) (+ x1 x2))
-  (define (b) (* x1 x2))
-  (if (< x1 x2) a b))
 
-(define aaa2
-  (lambda (x1 x2)
-    (define (a) (+ x1 x2))
-    (define (b) (* x1 x2))
-    (if (< x1 x2) a b)))
+;(define d square)
 
-
-(define d square)
-
-(define even? (lambda (n)
-                (if (zeroo? n)
-                    (= 1 1)
-                    (odd? (- n 1)))))
-(define odd?  (lambda (n)
-                (if (zeroo? n)
-                    (= 1 0)
-                    (even? (- n 1)))))
+(define even?
+  (lambda (n)
+    (if (zeroo? n)
+        #t
+        (odd? (- n 1)))))
+(define odd?
+  (lambda (n)
+    (if (zeroo? n)
+        #f
+        (even? (- n 1)))))
 
 #;(define (ttt)
   (display 10)
@@ -237,8 +236,8 @@
   (cond (#f 'first)
         ('(x y z) => cdr)
         (else 'else))
-  (let ((temp 'xyz))
-    (cond ('(abc edf ghi) => (lambda (x) temp))))
+  (let ((tmp 'xyz))
+    (cond ('(abc edf ghi) => (lambda (x) tmp))))
 
  ; (cond (#f  'first) 
  ;       (else 'else)
@@ -276,8 +275,9 @@
     (case (car x)
       ((a s d) 'first)
       ((f g h) 'second)
+      ((i) 'third)
       (else 'else)))
-  (list (f '(s d)) (f '(h i)) (f '(i a))))
+  (list (f '(s d)) (f '(h i)) (f '(j k))))
 
 
 (define (a1 x)
@@ -306,13 +306,11 @@
    (apply pair? 8 '())))
 
 
-(define (>= x y)
-  (not (< x y)))
 
 (define (a7 x)
-  (let loop((numbers x)
-            (nonneg '())
-            (neg '()))
+  (let loop ((numbers x)
+             (nonneg '())
+             (neg '()))
     (cond ((null? numbers) (list nonneg neg))
           ((>= (car numbers) 0)
            (loop (cdr numbers)
@@ -333,6 +331,11 @@
 
 (define a10 "\basd\a\r\n\t\"\\asd")
 
+(define (a11)
+  (let iter ((n 1000000))
+    (if (= n 0)
+        'ok
+        (iter (- n 1)))))
 
 (begin
   (display (dotest '(1 2 3 4) 'c))

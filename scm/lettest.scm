@@ -76,12 +76,12 @@
 (define (setxy x y) (begin (set! x 10) (set! y 5) (+ x y)))
 
 (define (mapf f)
-  (map f '(4 5 18 19 20)))
+  (map f '(4 5 18 19 20 30)))
 
 
 (define (fibs)
  (map mapf 
-      (list fib fib2 fib3 fib4 (lambda (x) (* x x)))))
+      (list fib fib2 fib3 (lambda (x) (* x x)))))
 
 
 (define (nest1 x y)

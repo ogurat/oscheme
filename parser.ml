@@ -17,15 +17,17 @@ type exp =
   | QuoteExp of sexp
   | QuasiQuoteExp of qqexp
   | IfExp of exp * exp * exp
+(*
   | AndExp of exp list
   | OrExp of  exp list
+ *)
   | LambdaExp of id list * varid * exp
   | ApplyExp of exp * exp list
   | MacroAppExp of id * sexp list
   | LetrecExp of (id * exp) list * exp
   | DoExp of (id list * exp list * exp list) * exp * exp * exp list
   | CondArrow of exp * exp * exp
-  | CondVal of exp * exp
+  | CondVal of exp * exp (*   *)
 (*  | CondClauseExp of condclause *)
   | SetExp of id * exp
   | SeqExp of exp * exp
@@ -178,8 +180,10 @@ and parseForm : sexp list -> exp = function
            let a = List ([Id "if"; x; List (Id "and_" :: rest); Bool false]) in
            parseExp a
      )
+(*
   | Id "and__" :: rest -> AndExp (parseExplist rest)
   | Id "or__" :: rest -> OrExp (parseExplist rest)
+ *)
   | Id "lambda" :: rest ->
      let (ids, varid, exp) = parseLambda rest in
      LambdaExp (ids, varid,exp)
@@ -206,7 +210,7 @@ and parseForm : sexp list -> exp = function
       )
   | Id "begin" :: rest ->
       body_to_exp (parseExplist rest)
-  | Id "do" :: rest -> parseDo_ rest
+  | Id "do" :: rest -> parseDo rest
   | Id "delay" :: rest ->
       (match rest with 
         [ex] ->  LambdaExp ([], Fixed, parseExp ex)
@@ -221,10 +225,11 @@ and parseForm : sexp list -> exp = function
       )
   | op :: rest ->
      (match op with
-        | Id "llet" | Id "aand" | Id "oor" | Id "ccond" | Id "ddo" | Id "bbegin" | Id "ccase" | Id "llet*" | Id "lletrec" ->
-        let (Id var) = op in
-        (* let a = List.map (fun e -> QuoteExp e) rest in *)
-        MacroAppExp (var, rest)
+     | Id "llet" | Id "aand" | Id "oor" | Id "ccond" | Id "ddo"
+     | Id "bbegin" | Id "ccase" | Id "llet*" | Id "lletrec" ->
+         let (Id var) = op in
+         (* let a = List.map (fun e -> QuoteExp e) rest in *)
+         MacroAppExp (var, rest)
      | _ -> let opp = parseExp op and args = parseExplist rest in
             ApplyExp (opp, args)
      )
@@ -289,7 +294,7 @@ and parseLetstar = function
 
 
 
-and parseDo = function (* todo:外側の変数loopを隠してしまう *)
+and parseDo = function (* 外側の変数looppを隠してしまう *)
 (* testが成立すると, expsを評価してdoを抜ける *)
   | List specs :: test_exps :: commands -> 
      let (vars, inits, steps) = splitSpecs specs
@@ -301,11 +306,11 @@ and parseDo = function (* todo:外側の変数loopを隠してしまう *)
      ((loop (lambda (vars) (if test (begin exps) (begin commands (loop steps))))))
      (loop inits)
   *)
-     let apploop = ApplyExp (VarExp "loop", steps) in
+     let apploop = ApplyExp (VarExp "loopp", steps) in
      let next = body_to_exp (cmds @ [apploop]) in
      let loopbody = IfExp (test, body_to_exp2 exps, next) in
      let loop = LambdaExp (vars, Fixed, loopbody) in
-     LetrecExp (["loop", loop], ApplyExp (VarExp "loop", inits))
+     LetrecExp (["loopp", loop], ApplyExp (VarExp "loopp", inits))
  
   | _ -> raise (ParseError "do ")
 
@@ -376,41 +381,39 @@ and parseCase' = function (* loop helper が不要 *)
 
   | List keyargs :: clauses ->
      let a = List [Id "let";
-                   List [List [Id "key"; List keyargs]];
-                   List (Id "case" :: Id "key" :: clauses)]
+                   List [List [Id "atom-key"; List keyargs]];
+                   List (Id "case" :: Id "atom-key" :: clauses)]
      in parseExp a
   | key :: List x :: rest ->
-     (match x, rest with
+     parseExp (match x, rest with
       | [Id "else"; Id "=>"; result],       [] -> 
-         parseExp (List [result; key])
+         List [result; key]
       | Id "else" :: results,  [] ->
-         parseExp (List (Id "begin" :: results))
+         List (Id "begin" :: results)
 
       | [List _ as atoms; Id "=>"; result], _ -> 
          let appmemv = List [Id "memv"; key; List [Id "quote"; atoms]] in
-         let sexp = List [Id "if"; appmemv;
+         List [Id "if"; appmemv;
                           List [result; key];
-                          List (Id "case" :: key :: rest)] in
-         parseExp sexp
+                          List (Id "case" :: key :: rest)]
       | List _ as atoms :: results, _ ->
          let appmemv = List [Id "memv"; key; List [Id "quote"; atoms]] in
-         let sexp = List [Id "if"; appmemv; 
-                          List (Id "begin" :: results);
-                          List (Id "case" :: key :: rest)] in
-         parseExp sexp
+         List [Id "if"; appmemv; 
+               List (Id "begin" :: results);
+               List (Id "case" :: key :: rest)]
 
       | _,_ -> raise (ParseError "case 1") 
      )
 
-and parseCase = function
+and parseCase = function (* 外側の変数atom-keyを隠してしまう *)
     [] -> raise (ParseError "case no key")
   | key :: [] -> raise (ParseError "case no clauses")
   | key :: clauses ->
      match key with
        List _ ->
        let a = List [Id "let";
-                     List [List [Id "key"; key]];
-                     List (Id "case" :: Id "key" :: clauses)]
+                     List [List [Id "atom-key"; key]];
+                     List (Id "case" :: Id "atom-key" :: clauses)]
        in parseExp a
      | _ ->
        let key = parseExp key in
