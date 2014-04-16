@@ -87,8 +87,8 @@
   `(a `(b . `(c . ,,,'x)) e)
   )
 
-
-(define (qq7-10)
+; alexpander: No matching rule for macro use: (#(unquote-splicing-error 35 41) ((#(unquote-splicing 34) ,,@(list (+ 1 2))) )
+#;(define (qq7-10)
   `(1 ```,,@,,@(list (+ 1 2)) 4))
 
 ; error 

@@ -665,4 +665,6 @@ in
   ("force", function
        [x] -> apply x [EmptyListV]
      | _ -> failwith "Arity mismatch: force");
+  ("error", function
+     | x -> failwith ("error:" ^ List.fold_right (fun x y -> printval x ^ y) x "")  );
   ]

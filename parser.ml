@@ -560,13 +560,12 @@ and parseBody : sexp list -> body = function
 
 
 let rec parseDefs = function
+    [] -> []
   | List (Id "define" :: x) :: rest ->
-      let (id, exp) = parseDef x and (defs,l) = parseDefs rest in
-      (id, exp) :: defs, l
+      parseDef x  :: parseDefs rest
   | List (Id "define-macro" :: x) :: rest ->
-      let (id, exp) = parseDefMacro x and (defs,l) = parseDefs rest in
-      (id, exp) :: defs, l
-  | exl -> [], List.map parseExp exl
+      parseDefMacro x :: parseDefs rest
+  | x :: exl -> parseDefs exl
 
 
 

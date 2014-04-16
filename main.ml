@@ -1,5 +1,5 @@
 
-
+open Parser
 open Scheme
 
 
@@ -16,16 +16,34 @@ let sexps_from =
 
 
 
-let eeval (defs, exp) =
-  let primis = ge Eval.eval_apply in
+let eeval sexps =
+  let (defs, exp) = parseBody sexps
+  and primis = ge Eval.eval_apply in
   let env = Eval.extendletrec primis defs in
-    Eval.evalExp env exp
+  Eval.evalExp env exp
 
-let aeval (defs, exp) =
-  let primis = ge Analyze.eval_apply
-  and dd = List.map (fun (id, ex) -> (id, Analyze.analyzeExp ex)) defs in
+let aeval sexps =
+  let (defs, exp) = parseBody sexps
+  and primis = ge Analyze.eval_apply in
+  let dd = List.map (fun (id, ex) -> (id, Analyze.analyzeExp ex)) defs in
   let env = Analyze.extendletrec primis dd in
-    Analyze.analyzeExp exp env
+  Analyze.analyzeExp exp env
+
+
+let aleval sexps =
+  let primis = ge Eval.eval_apply
+  and defs = parseDefs (sexps_from "lib/alexpander.scm") in
+  let env = Eval.extendletrec primis defs in
+  let expandproc = List.assoc "expand-program" defs in
+  let expand = ApplyExp (expandproc, [QuoteExp (Syntax.List sexps)]) in
+  let x = Eval.evalExp env expand in
+
+  match Valtype.val_to_sexp x with 
+    Syntax.List ss ->
+      let (defs, exp) = parseBody ss in
+      let env = Eval.extendletrec primis defs in
+      Eval.evalExp env exp
+
 
 (*
 let einterpret name =
@@ -35,14 +53,18 @@ let einterpret name =
 
 let _ =
 
-  let fn = ref [] and ev = ref false in
-  let spec = "-eval", Arg.Set ev, "eval evaluator" in
-  Arg.parse [spec] (fun s -> fn := s :: !fn) "";
+  let fn = ref [] and ev = ref false and syntax = ref false in
+  let specs = [ "-eval", Arg.Set ev, "eval evaluator";
+"-syntax", Arg.Set syntax, "syntax-rules" ] in
+  Arg.parse specs (fun s -> fn := s :: !fn) "";
    if List.length !fn > 0 then
-     let v = Parser.parseBody (sexps_from (List.hd !fn)) in
+     let v = (sexps_from (List.hd !fn)) in
      let a =
        if !ev then
-         printval (eeval v)
+         if !syntax then
+           printval (aleval v)
+         else
+           printval (eeval v)
        else
 	 printval (aeval v) in
      print_endline a

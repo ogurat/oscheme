@@ -177,7 +177,7 @@ let rec analyzeExp  : exp -> 'a proctype = function
   | SeqExp (a, b) ->
      let proc1 = analyzeExp a and proc2 = analyzeExp b in
      fun env -> proc1 env; proc2 env;
-
+(*
   | DoExp ((vars, inits, steps), test, exp, cmds) ->
      let inits = List.map analyzeExp inits
        and steps = List.map analyzeExp steps
@@ -194,7 +194,7 @@ let rec analyzeExp  : exp -> 'a proctype = function
        | _ -> exp newenv
        ) in
      loop (List.map (fun p -> p env) inits)
-
+ *)
 
 (* unused  *)
 and analyze_seq exps =

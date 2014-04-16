@@ -138,7 +138,6 @@
           (+ (fib (- n 1)) (fib (- n 2))))))
 
 
-(define (zeroo? n) (= n 0))
 
 (define (plus x y) (+ x y))
 (define (times x y) (* x y))
@@ -156,11 +155,11 @@
 (define (ev n)
   (letrec
       ((e? (lambda (k)
-             (if (zeroo? k)
+             (if (zero? k)
                  #t
                  (o? (- k 1)))))
        (o? (lambda (j)
-             (if (zeroo? j)
+             (if (zero? j)
                  #f
                  (e? (- j 1))))))
     (e? n)))
@@ -168,12 +167,12 @@
 (define (ev2 x)
   (define e?
     (lambda (n)
-      (if (zeroo? n)
+      (if (zero? n)
           #t
           (o? (- n 1)))))
   (define o?
     (lambda (n)
-      (if (zeroo? n)
+      (if (zero? n)
           #f
           (e? (- n 1)))))
   (e? x))
@@ -183,12 +182,12 @@
 
 (define even?
   (lambda (n)
-    (if (zeroo? n)
+    (if (zero? n)
         #t
         (odd? (- n 1)))))
 (define odd?
   (lambda (n)
-    (if (zeroo? n)
+    (if (zero? n)
         #f
         (even? (- n 1)))))
 
@@ -332,7 +331,7 @@
 (define a10 "\basd\a\r\n\t\"\\asd")
 
 (define (a11)
-  (let iter ((n 1000000))
+  (let iter ((n 400000))
     (if (= n 0)
         'ok
         (iter (- n 1)))))

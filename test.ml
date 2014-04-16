@@ -63,7 +63,7 @@ let te =  V (PairV ( ref (BoolV true), ref (PairV (  ref UnitV, ref (PairV ( ref
 
 ("a10",   V (StringV "\basd\007\r\n\t\"\\asd")) ;
 
-("(a11)", Ex "'ok" ) ;
+(* "(a11)", Ex "'ok" *) 
 
 ])
 
@@ -226,27 +226,28 @@ let sparse s =
 let sparse_top s =
   Sparser.toplevel Lexer.main (Lexing.from_string s)
 
-let parse s = Parser.parseExp (sparse s)
-(*
+
 let parse s =
-  Parser.parseExp (Sparser.sexpdata Lexer.main (Lexing.from_string s))
- *)
+  Parser.parseExp (sparse s)
+
 
 let analyze s =
   Analyze.analyzeExp (parse s)
 
 let  eval s =
-  let x = parse s 
-    and primis = ge Analyze.eval_apply in
-  (* let envv = Analyze.extendletrec primis [] in *)
-    Analyze.analyzeExp x primis
+  let (defs, exp) = parseBody (sparse_top s) 
+  and primis = ge Analyze.eval_apply in
+  let dd = List.map (fun (id, ex) -> (id, Analyze.analyzeExp ex)) defs in
+  let env = Analyze.extendletrec primis dd in
+  Analyze.analyzeExp exp env
 
 let  eeval s =
-  let x = parse s 
-    and primis = ge Eval.eval_apply in
-  (* let envv = Analyze.extendletrec primis [] in *)
-    Eval.evalExp primis x
+  let (defs, exp) = parseBody (sparse_top s) 
+  and primis = ge Eval.eval_apply in
+  let env = Eval.extendletrec primis defs in
+  Eval.evalExp env exp
 
+(* traditional macro  *)
 let  expand s =
   let x = parse s 
     and primis = ge Eval.eval_apply in
@@ -272,16 +273,12 @@ let interpret name =
  *)
 
 
-let show_sexp (file, _) =
-  let es = sexps_from file in
-  List.map (function 
-               List [Id "define"; List (Id id :: formals); body] -> (id, body)
-              | List [Id "define"; Id id; exp] -> (id, exp)) es
 
 (*
 let def_sexp id es =
-  Parser.to_string2 (List.assoc id es)
+  to_string2 (List.assoc id es)
  *)
+(*
 let pexec (s, v) =
   try 
     let vv = parse s in
@@ -294,7 +291,7 @@ let perr cases =
  List.map pexec cases
 
 let perr () = perr parse_err_case
-
+ *)
 
 let exec eval env (s, v) = (* v:期待結果 *)
   try 
@@ -316,12 +313,12 @@ let exec eval env (s, v) = (* v:期待結果 *)
        | _ -> (s, Printexc.to_string ex, false)
       )
 
-
+(*
 let exec_expand env (var,s) =
  
     let o = (Expand.expandExp env s) in
     (var, o)
-(*
+
   with
      Match_failure _ as ex ->
        var, ex
@@ -332,86 +329,76 @@ let exec_expand env (var,s) =
 
 
 let atest (file, cases) =
-  let primis = ge Analyze.eval_apply
-  and (defs, _) = Parser.parseDefs (sexps_from file) in
+  let defs = parseDefs (sexps_from file)
+  and primis = ge Analyze.eval_apply in
   let dd = List.map (fun (id, ex) -> (id, Analyze.analyzeExp ex)) defs in
   let env = Analyze.extendletrec primis dd in
- List.map (exec Analyze.analyzeExp env) cases
+  List.map (exec Analyze.analyzeExp env) cases
 
 
 let etest (file, cases) =
-  let primis = ge Eval.eval_apply
-  and (defs, _) = Parser.parseDefs (sexps_from file) in
+  let defs = parseDefs (sexps_from file)
+  and primis = ge Eval.eval_apply in
   let env = Eval.extendletrec primis defs in
- List.map (exec (fun exp en-> Eval.evalExp en exp) env) cases
+  List.map (exec (fun exp en-> Eval.evalExp en exp) env) cases
 
 let show_exp (file, _) =
-  let (defs, _) = Parser.parseDefs (sexps_from file) in
-  defs
+  let defs = parseDefs (sexps_from file) in
+  fun name -> List.assoc name defs
 
-let def_exp =
-  List.assoc
+
 
 let show_expand (file, _) =
-  let primis = ge Eval.eval_apply
-  and (defs, _) = Parser.parseDefs (sexps_from file) in
+  let defs = parseDefs (sexps_from file)
+  and primis = ge Eval.eval_apply in
   let env = Eval.extendletrec primis defs in
- List.map (exec_expand env) defs
+  let x = List.map (fun (var,s) -> var, Expand.expandExp env s) defs in
+  fun name -> List.assoc name x
 
-let alsparse s =
-  let primis = ge Eval.eval_apply
-  and (defs, _) = Parser.parseDefs (sexps_from "lib/alexpander.scm") in
-  let env = Eval.extendletrec primis defs
-  and sexp = sparse s in
+
+let alexpand sexps =
+  let defs = parseDefs (sexps_from "lib/alexpander.scm")
+  and primis = ge Eval.eval_apply in
+  let env = Eval.extendletrec primis defs in
 (*
   let expandproc = List.assoc "expand-program" env
   and sexps = Eval.evalExp env (QuoteExp (List sexps)) in
   let x = Eval.eval_apply !expandproc [sexps] in
  *)
   let expandproc = List.assoc "expand-program" defs in
-  let expand = ApplyExp (expandproc, [QuoteExp (List [sexp])]) in
-  let x = Eval.evalExp env expand in
-  val_to_sexp x
-      
-
-let alexpand (file, cases) =
-  let primis = ge Eval.eval_apply
-  and (defs, _) = Parser.parseDefs (sexps_from "lib/alexpander.scm") in
-  let env = Eval.extendletrec primis defs
-  and sexps = sexps_from file
-(*
-  let expandproc = List.assoc "expand-program" env in
-  and sexps = Eval.evalExp env (QuoteExp (List sexps)) in
-  let x = Eval.eval_apply !expandproc [sexps] in
- *)
-  and expandproc = List.assoc "expand-program" defs in
   let expand = ApplyExp (expandproc, [QuoteExp (List sexps)]) in
   let x = Eval.evalExp env expand in
+  match val_to_sexp x with
+    List s -> s
 
-  match val_to_sexp x with 
-    List ss ->
-      let (defs, _) = parseDefs ss in defs
+
+let eval_body(defs, exp) =
+  let primis = ge Eval.eval_apply in
+  let env = Eval.extendletrec primis defs in
+  Eval.evalExp env exp
+
+let aleval s =
+  let ex = alexpand (sparse_top s) in
+  eval_body (parseBody ex)
+
+
+let alparse s =
+  let ss = alexpand (sparse_top s) in
+  let (defs, e) = parseBody ss in e
+
+
+let show_alexpand (file, _) =
+  let ss = alexpand (sexps_from file) in
+  let defs =  parseDefs ss in
+  fun name -> List.assoc name defs
 
 
 let altest (file, cases) =
-  let primis = ge Eval.eval_apply
-  and (defs, _) = Parser.parseDefs (sexps_from "lib/alexpander.scm") in
-  let env = Eval.extendletrec primis defs
-  and sexps = sexps_from file
-(*
-  and expandproc = List.assoc "expand-program" env in
-  and sexps = Eval.evalExp env (QuoteExp (List sexps)) in
-  let x = Eval.eval_apply !expandproc [sexps] in
- *)
-  and expandproc = List.assoc "expand-program" defs in
-  let expand = ApplyExp (expandproc, [QuoteExp (List sexps)]) in
-  let x = Eval.evalExp env expand in
-
-  match val_to_sexp x with 
-    List ss ->
-      let (defs, _) = parseDefs ss in
-      let env = Eval.extendletrec primis defs in
-      List.map (exec (fun exp en -> Eval.evalExp en exp) env) cases
+  let ss = alexpand (sexps_from file) in
+  let defs = parseDefs ss
+  and primis = ge Eval.eval_apply in
+  let env = Eval.extendletrec primis defs in
+  List.map (exec (fun exp en -> Eval.evalExp en exp) env) cases
 
 
 
