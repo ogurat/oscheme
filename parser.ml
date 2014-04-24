@@ -15,7 +15,8 @@ type exp =
   | VarExp of id
   | UnspecifiedExp
   | QuoteExp of sexp
-  | QuasiQuoteExp of qqexp
+(*  | QuasiQuoteExp of qqexp *)
+  | ConsExp of exp * exp | NilExp (* for quasiquote   *)
   | IfExp of exp * exp * exp
 (*
   | AndExp of exp list
@@ -34,6 +35,7 @@ type exp =
   | MacroExp of id list * varid * exp
 and define = id * exp
 (* and body = define list * exp *)
+(*
 and qqexp =
     S of sexp (* s expression *)
   | Unquote of exp
@@ -43,7 +45,7 @@ and qqexp =
  *)
   | P of qqexp * qqexp (* cons pair *)
   | Nil
-
+ *)
 type body = define list * exp
 
 type macro = id list * varid * exp (* macroのみの環境(namespace)を想定  *)
@@ -135,15 +137,14 @@ and parseForm : sexp list -> exp = function
         [a] -> QuoteExp a
       | _ -> raise (ParseError "quote")
       )
+
   | Id "quasiquote" :: rest ->
       (match rest with
         [a] ->
-          (match parse_qq 0 a with
-             UnquoteSplice _ -> raise (ParseError ("qq splice: " ^ string_of rest))
-           | x -> QuasiQuoteExp x
-          )
+          parse_qq 0 a
       | qq -> raise (ParseError ("quasiquote: " ^ string_of qq))
       )
+
   | Id "unquote" :: x | Id "unquote-splicing" :: x ->
            raise (ParseError ("unquote not in qq: " ^ string_of x))
   | Id "if" :: rest ->
@@ -411,10 +412,10 @@ and parseCase = function (* 外側の変数atom-keyを隠してしまう *)
   | key :: clauses ->
      match key with
        List _ ->
-       let a = List [Id "let";
-                     List [List [Id "atom-key"; key]];
-                     List (Id "case" :: Id "atom-key" :: clauses)]
-       in parseExp a
+       let case = List (Id "case" :: Id "atom-key" :: clauses) in
+       let exp = LambdaExp (["atom-key"], Fixed, parseExp case) in
+       ApplyExp (exp, [parseExp key])
+
      | _ ->
        let key = parseExp key in
        let rec loop = function
@@ -439,7 +440,57 @@ and parseCase = function (* 外側の変数atom-keyを隠してしまう *)
          | _ -> raise (ParseError "case clause not list") in
        loop clauses
 
+and parse_qq level : sexp -> exp = function
 
+  | Syntax.List x | Syntax.Vector x ->
+     let rec loop level = function
+        [] -> NilExp
+      | [Syntax.Id "unquote" as u; a] ->
+          if level = 0 then
+            parseExp a
+          else
+            ConsExp (parse_qq (level - 1) u, loop (level - 1) [a])
+      | [Syntax.Id "quasiquote" as u; a] ->
+         ConsExp (parse_qq (level + 1) u, loop (level + 1) [a])
+
+      | Syntax.Id "unquote" :: _ ->
+         raise (ParseError "unquote format")
+(*
+      | [Syntax.Id "unquote-splicing" as u;a] when level = 0 ->
+         (match rest with
+           [] -> parseExp a
+         | _ ->  ApplyExp (VarExp "append", [parseExp a; loop (level-1) rest])
+         )
+ *)
+      | Syntax.Id "unquote-splicing" :: _  ->
+         raise (ParseError ("unquote-splicing: invalid context: " ^ string_of x))
+      | Syntax.Id "quasiquote" :: _ ->
+         raise (ParseError "quasiquote format")
+
+      | a :: rest -> 
+         (match a with
+         | Syntax.List [Syntax.Id "unquote-splicing";a] when level = 0 ->
+             (match rest with
+                [] -> parseExp a
+              | _ ->  ApplyExp (VarExp "append", [parseExp a; loop (level) rest])
+             )
+         | _ -> ConsExp (parse_qq level a, loop level rest))
+     in
+     (match x with
+
+      | [Syntax.Id "unquote-splicing" as u;a] when level > 0 ->
+(*
+         if level = 0 then
+           raise (ParseError ("unquote-splicing: invalid context: level: 0 " ^ string_of x))
+         else
+ *)
+           ConsExp (parse_qq (level - 1) u,  loop (level - 1) [a])
+
+      | _ ->  loop level x
+     )
+  | x -> QuoteExp x
+
+(*
 and parse_qq level : sexp -> qqexp = function
   | Syntax.List x | Syntax.Vector x ->
      let rec loop level = function
@@ -475,7 +526,7 @@ and parse_qq level : sexp -> qqexp = function
          loop level x
      )
   | x -> S x
-
+ *)
 (*
 and parseQuasi depth : sexp -> sexp = function
   | Syntax.List [Syntax.Id "unquote"; form] -> form

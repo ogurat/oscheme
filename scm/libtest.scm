@@ -26,19 +26,27 @@
    (map + '(2 3 4 ) '(4 5 6) '(7 8 9) '(10 11 12))
    (map list '(a s d) '(x y z) '(1 2 3 4 5) '(asd fgh jkl))))
 
+(define (a5)
+  (list
+   (append 'a)
+   (append '(a s) 'd)
+   (append '(a s) '(d))
+   (append '(a s) '(d) 'e)
+   (append '(a s) '(d) '(e))))
+
 (define (a4 s)
   (list
    (fold-right + 0 s)
    (fold + 0 s)
    (fold cons '() s)))
 
-(define (a5 s n)
+(define (a7 s n)
   (list
    (string? s)
    (string-length s)
    (string-ref s n)))
 
-(define (a6 s)
+(define (a8 s)
   (let ((vec (list->vector s)))
     (list
      vec (vector-ref vec 1) (vector-length vec) (vector->list vec))))

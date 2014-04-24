@@ -78,7 +78,7 @@ let lettestcase = ("scm/lettest.scm", [
 ("(letlist 3 4)", Ex "'(9 8 5)") ;
 ("(letlist2 3 4)", Ex "'(9 8 17)") ;
 ("(letstar)", Ex "70") ;
-("(mapf fourtimes)", Ex "'(16 20 72 76 80)") ;
+("(mapf fourtimes)", Ex "'(16 20 72 76 80 120)") ;
 
 	       ])
 
@@ -117,6 +117,7 @@ let qq = ("scm/quasiquote.scm", [
 ("(qq5)", Ex "'(a 3 4 5 6 b)") ;
 ("(qq5-1)", Ex "'(4 5 6)") ;
 ("(qq5-5)", Ex "'((foo 7) . cons)") ;
+("(qq5-6)", Ex "'((foo 7) . cons)") ;
 ("(qq5-7)", Ex "'(foo 7 . cons)") ;
 ("(qq5-8)", Ex "'(foo 7 . cons)") ;
 
@@ -135,13 +136,12 @@ let qq = ("scm/quasiquote.scm", [
 ("(qq7-9)",  Ex "'(a `(b quasiquote (c . ,,x)) e)") ;
 ("(qq7-10)", Ex "'(1 ```,,@,3 4)") ;
 
-("(qq8 5 6)", Exc (Failure "splice not list")) ;
+("(qq8 5 6)", Exc (Failure "Arity mismatch: append not pair: 11")) ;
 ("(qq10 1)", Ex "'(7 1)") ;
 
 ("(qq11 'x)", Ex "'((x b))") ;
 ("(qq12 '(d))", Ex "'(a b ((c d)))") ;
 ("(qq12_2)", Ex "'(a b ((c . 3)))") ;
-("(quasiquote (a b ((c unquote x y))))", Exc (ParseError("unquote format"))) ; 
 
 ("(qq13 'a)",   Ex "'(foo . a)") ;
 ("(qq13_ 'a)",  Ex "'(foo . a)") ;
@@ -151,18 +151,28 @@ let qq = ("scm/quasiquote.scm", [
 ("(qq14 'a)", Ex "'a") ;
 ("(qq14 '(a b c))", Ex "'(a b c)") ;
 
-("(quasiquote (foo (unquote-splicing x y)))", Exc (ParseError("unquote-splicing: invalid context"))) ; 
-
-("`,@(list 1 2)", Exc (ParseError("qq splice: (unquote-splicing (list 1 2))")) ) ;
-
-("`(,,(a b))", Exc (ParseError("unquote not in qq: (a b)"))  ) ;
-("`(foo . ,@x)", Exc (ParseError("unquote-splicing: invalid context"))  );
-("`(a . ,@'(a b))", Exc (ParseError "unquote-splicing: invalid context") ) ;
-("`,(quasiquote 'x 'y)", Exc (ParseError("quasiquote: (quote x) (quote y)"))  ) ;
 ("(qq18 'x 'y)", Ex "'(x y)"  ) ;
 ("(qq19 'as 'd)", Ex "'(a quasiquote (,as ,d))"  ) ;
 ("(qq20)", Ex "'(`((unquote a b)))") ;
 ("(qq22 '(a s d))", Ex "'`(a b ,(a s d))") ;
+
+
+("(quasiquote (a b ((c unquote x y))))", Exc (ParseError("unquote format"))) ; 
+
+("(quasiquote (foo (unquote-splicing x y)))",
+      Exc (ParseError("unquote-splicing: invalid context: unquote-splicing x y"))) ; 
+
+(* ("`,@(list 1 2)", Exc (ParseError("qq splice: (unquote-splicing (list 1 2))")) ) ; *)
+("`,@(list 1 2)", 
+      Exc (ParseError("unquote-splicing: invalid context: unquote-splicing (list 1 2)")) ) ;
+
+
+("`(,,(a b))", Exc (ParseError("unquote not in qq: (a b)"))  ) ;
+("`(foo . ,@x)",
+      Exc (ParseError("unquote-splicing: invalid context: foo unquote-splicing x"))  );
+("`(a . ,@'(a b))",
+      Exc (ParseError "unquote-splicing: invalid context: a unquote-splicing (quote (a b))") ) ;
+("`,(quasiquote 'x 'y)", Exc (ParseError("quasiquote: (quote x) (quote y)"))  ) ;
 
 
            ])
@@ -178,12 +188,12 @@ let lib = ("scm/libtest.scm", [
 "(a2 '(1 2 3) 2)", Ex "'(#f (2 3) (2 3))" ;
 "(a3 '((a 1) (b 2) (c 3)) 'c)", Ex "'((c 3) (c 3) (c 3))" ; 
 
-
 "(maptest)", Ex "'((9 16 25) (5 10 16) (23 27 31) ((a x 1 asd) (s y 2 fgh) (d z 3 jkl)))" ;
 (* "(a4 '(1 2 3 4))", Ex "'(10 10 (4 3 2 1))" ; *)
+"(a5)", Ex "'(a (a s . d) (a s d) (a s d . e) (a s d e))" ;
 
-"(a5 \"abcdefg\" 4)", Ex "'(#t 7 #\\e)" ; 
-"(a6 '(a s d))", Ex "'(#(a s d) s 3 (a s d))" ;
+"(a7 \"abcdefg\" 4)", Ex "'(#t 7 #\\e)" ; 
+"(a8 '(a s d))", Ex "'(#(a s d) s 3 (a s d))" ;
 
             ] )
 
@@ -203,6 +213,9 @@ let macro = ("scm/mlib.scm", [
 "(cond1 3 'b)", Ex "'(else (b 2) else)" ;
 
 "(case1 2)", Ex "'(prime composit first second else)" ;
+
+("(qq6)" , Ex "'(a `(b c ,(foo 5 d) e) f)") ;
+("(qq7-1)", Ex "'(a `(b c . ,y) 2 e)") ;
 
 	       ])
 
@@ -231,8 +244,10 @@ let parse s =
   Parser.parseExp (sparse s)
 
 
+(*
 let analyze s =
   Analyze.analyzeExp (parse s)
+ *)
 
 let  eval s =
   let (defs, exp) = parseBody (sparse_top s) 
@@ -249,10 +264,10 @@ let  eeval s =
 
 (* traditional macro  *)
 let  expand s =
-  let x = parse s 
-    and primis = ge Eval.eval_apply in
-  (* let envv = Analyze.extendletrec primis [] in *)
-    Expand.expandExp primis x
+  let (defs, exp) = parseBody (sparse_top s) 
+  and primis = ge Eval.eval_apply in
+  let env = Eval.extendletrec primis defs in
+  Expand.expandExp env exp
 
 
 let withfile proc name =
@@ -345,7 +360,6 @@ let etest (file, cases) =
 let show_exp (file, _) =
   let defs = parseDefs (sexps_from file) in
   fun name -> List.assoc name defs
-
 
 
 let show_expand (file, _) =

@@ -33,31 +33,10 @@ let rec analyzeExp  : exp -> 'a proctype = function
      )
   | QuoteExp x ->
       let result = evalQuote x in fun _ -> result
-  | QuasiQuoteExp x ->
-     let rec evalQuasi v env =
-       (match v with
-         S x -> evalQuote x
-       | Unquote x -> analyzeExp x env
-       | UnquoteSplice x ->
-          failwith "splice not in list"
-       | Nil -> EmptyListV
-       | P (x, y) ->
-          let rec splice rest = function
-              EmptyListV -> evalQuasi rest env
-            | PairV (a, b) -> (PairV (a, ref (splice rest !b)))
-            | x -> failwith "splice not list"
-             in
-          (match x with
-             UnquoteSplice x ->
-             (match y with
-              | Nil -> analyzeExp x env
-              | _ -> splice y (analyzeExp x env)
-             )
-           | _ -> PairV (ref (evalQuasi x env), ref (evalQuasi y env))
-          )
-       ) in
-     evalQuasi x
-
+  | ConsExp (a, b) ->
+     let a = analyzeExp a and b = analyzeExp b in
+     fun env -> PairV (ref(a env), ref(b env))
+  | NilExp -> fun _ -> EmptyListV
   | IfExp (c, a, b) ->
       let pred  = analyzeExp c
       and conseq = analyzeExp a
@@ -93,11 +72,11 @@ let rec analyzeExp  : exp -> 'a proctype = function
   | LambdaExp (ids, varid, exp) ->
      let proc = analyzeExp exp in
      fun env -> ProcV (ids, varid, proc, env)
-(*
+
   | MacroExp (ids, vararg, exp) ->
      let proc = analyzeExp exp in
-     fun env -> MacroV (ids, vararg, proc, env)
- *)
+     fun env -> ProcV (ids, vararg, proc, env)
+
   | ApplyExp (exp, args) ->
      let proc = analyzeExp exp
      and a = List.map analyzeExp args in

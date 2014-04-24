@@ -15,50 +15,20 @@ let rec expandExp env = function
       | x -> x
      )
   | QuoteExp x -> evalQuote x
-  | QuasiQuoteExp x -> 
-     let rec evalQuasi = function
-         S x -> evalQuote x
-       | Unquote x -> expandExp env x
-       | UnquoteSplice x ->
-          failwith "splice not in list"
-       | Nil -> EmptyListV
-       | P (x, y) ->
-          let rec splice rest = function
-              EmptyListV -> evalQuasi rest
-            | PairV (a, b) -> (PairV (a, ref (splice rest !b)))
-            | x -> failwith "splice not list"
-             in
-          (match x with
-             UnquoteSplice x ->
-             (match y with
-              | Nil -> expandExp env x
-              | _ -> splice y (expandExp env x)
-             )
-           | _ -> PairV (ref (evalQuasi x), ref (evalQuasi y))
-          )
-     in evalQuasi x
  *)
+  | ConsExp (a, b) -> ConsExp (expandExp env a, expandExp env b)
   | IfExp (c, a, b) ->
      IfExp (expandExp env c, expandExp env a, expandExp env b)
 (*
-  | AndExp ls ->
-      let rec loop result = function
-        | [] -> result
-        | a :: rest ->
-            (match result with
-               BoolV false -> BoolV false
-             | _ -> loop (expandExp env a) rest
-            )
-      in loop (BoolV true) ls
   | OrExp ls ->
      OrExp (List.map (expandExp env) ls)
  *)
   | LambdaExp (ids, varid, exp) ->
       LambdaExp (ids, varid, expandExp env exp)
-(*
+
   | MacroExp (ids, varid, exp) ->
       MacroExp (ids, varid, expandExp env exp)
- *)
+
   | ApplyExp (exp, args) ->
       let proc = expandExp env exp
       and a = List.map (expandExp env) args in
@@ -82,14 +52,10 @@ let rec expandExp env = function
   | CondVal (test, alt) ->
      CondVal (expandExp env test,
                          expandExp env alt)
-(*
-  | CondClauseExp x -> expand_cond env x
- *)
-(*
+
   | SetExp (id, exp) ->
-      let a = lookup id env in
-      a := (expandExp env exp); UnitV
- *)
+     SetExp (id, expandExp env exp)
+
   | SeqExp (a, b) ->
      SeqExp (expandExp env a, expandExp env b)
 

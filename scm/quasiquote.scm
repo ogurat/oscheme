@@ -24,7 +24,7 @@
 (define (qq5)
   `(a ,(+ 1 2) ,@(map abs '(4 5 6)) b))
 (define (qq5-1)
-  `(,@(map abs '(4 5 6))))
+  `(,@(map abs '(4 5 6)))) ; (4 5 6)
 
 
 (define (qq5-5)
@@ -38,7 +38,7 @@
   `(foo ,(- 10 3) ,@(car '(cons)))) ; (foo 7 . cons)
 
 (define (qq5-9)
-  `(foo asd . 'x))
+  `(foo asd . 'x)) ; (foo asd quote x)
 
   
 ; nest
@@ -101,16 +101,6 @@
 (define (qq11 a)
   `(,`(,a b))) ; '((a b))
 
-; racket: unquote: not in quasiquote in: (unquote (a b))
-; gauche: Compile Error: unquote appeared outside quasiquote: ,(a b)
-#;(define (qq12)
-  `(,,(a b))
-  )
-
-#;(define (quasi7)
-  `,@(list 1 2)
-  )
-
 
 (define (qq12 x)
   (quasiquote (a b ((c unquote x)))))
@@ -120,7 +110,6 @@
 #;(define (qq12_3)
   (quasiquote (a b ((c unquote x y))))
   )
-
 
 
 (define (qq13 x)
@@ -150,9 +139,26 @@
   (quasiquote (foo unquote-splicing 'x))
   )
 
-#;(define (qq15)
-  (quasiquote (foo (unquote-splicing 'x 'y)))
+#;(define (e1)
+  (quasiquote (foo (unquote-splicing x y)))
   )
+; racket: unquote-splicing: invalid context within quasiquote in: unquote-splicing
+; gauche: Compile Error: invalid unquote-splicing form in this context: ,@(list 1 2)
+#;(define (e2)
+    `,@(list 1 2)
+  )
+; racket: unquote: not in quasiquote in: (unquote (a b))
+; gauche: Compile Error: unquote appeared outside quasiquote: ,(a b)
+#;(define (e3)
+  `(,,(a b))
+  )
+#;(define (e4)
+    `(foo . ,@x))
+#;(define (e5)
+    `(a . ,@'(a b)))
+#;(define (e6)
+    `,(quasiquote x y))
+
 
 ; racket: unquote-splicing: invalid context within quasiquote in: unquote-splicing
 ; gauche: Compile Error: invalid unquote-splicing form in this context: ,@'(a b)
@@ -173,15 +179,17 @@
   `(a . `(,,x ,,y)))
 
 ; http://togetter.com/li/134984
+; alexpander: (`(,a ,b))
 (define (qq20)
   `(`(,,@'(a b))))
 
 ; r6rs
-(define (qq21 g)
+#;(define (qq21 g)
   ``(foo ,,@g))
 
 (define (qq22 x)
   ``(a b ,,x))
 
 (define (qq23 x)
-  '(`,@x))
+  '(`,@x)) ; (`,@x)
+

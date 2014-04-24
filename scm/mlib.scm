@@ -147,10 +147,10 @@
 
 (define-macro lletrec
   (lambda (args . body)
-    (llet ((vars (map car args))
+    (let ((vars (map car args))
            (vals (map cadr args)))
       `(llet ,(map (lambda (x) `(,x '*undef*)) vars)
-            ,@(map-2 (lambda (x y) `(set! ,x ,y)) vars vals)
+            ,@(map (lambda (x y) `(set! ,x ,y)) vars vals)
             ,@body))))
 
 
@@ -187,36 +187,40 @@
 
 (define-macro ddo
   (lambda (var-form test-form . args)
-    (define map-2
+    #;(define map-2
       (lambda (fn xs ys)
         (if (null? xs)
             '()
             (cons (fn (car xs) (car ys)) (map-2 fn (cdr xs) (cdr ys))))))
-    (llet ((vars (map car var-form))
-           (vals (map cadr var-form))
-           (step (map cddr var-form)))
+    (let ((vars (map car var-form))
+          (vals (map cadr var-form))
+          (step (map cddr var-form)))
       `(lletrec ((loop 
                  (lambda ,vars
                    (if ,(car test-form)
                        (bbegin ,@(cdr test-form))
                        (bbegin
                          ,@args
-                         (loop ,@(map-2 (lambda (x y)
+                         (loop ,@(map (lambda (x y)
                                           (if (null? x) y (car x)))
-                                        step
-                                        vars)))))))
+                                      step
+                                      vars)))))))
          (loop ,@vals)))))
 
 
 (define (let1)
   (llet ((x 1) (y 2)) (+ x y)))
+; alexpander: Empty list:  () used as an expression, syntax, or definition.
 (define (let2)
   (llet () 'asd))
 (define (let3)
   (llet () 'a 'b 'asd))
 
 (define (aa x y)
-  (aand 'a 'b (+ x y) (* x y)))
+  (aand 'a 'b 'c (+ x y) (* x y)))
+
+(define (aa1 x y)
+  (oor 'a 'b 'c (+ x y) (* x y)))
 
 (define (cond0 x s)
   (ccond ((eqv? x 1) 'a 'first)
@@ -255,7 +259,7 @@
 
 (define (case1 x)
   (define (f x)
-    (case (car x)
+    (ccase (car x)
       ((a s d) 'first)
       ((f g h) 'second)
       (else 'else)))
@@ -269,3 +273,18 @@
      ((1 4 6 8 9) 'composit))
    (f '(s d)) (f '(h i)) (f '(i a))))
 
+(define (case2)
+  (define (f x)
+    (ccase (car x)
+      ((a s d) 'first)
+      ((f g h) 'second)
+      ((i) 'third)
+      (else 'else)))
+  (list (f '(s d)) (f '(h i)) (f '(j k))))
+
+
+(define (qq6)
+  `(a `(b c ,(foo ,(aand 4 5) d) e) f))
+
+(define (qq7-1)
+  `(a `(b c . ,,(aand 'x 'y)) ,(aand 1 2) e))

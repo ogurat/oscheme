@@ -15,6 +15,10 @@ let rec evalExp env = function
       | x -> x
      )
   | QuoteExp x -> evalQuote x
+  | ConsExp (x, y) ->
+     PairV (ref(evalExp env x), ref(evalExp env y))
+  | NilExp -> EmptyListV
+(*
   | QuasiQuoteExp x -> 
      let rec evalQuasi = function
          S x -> evalQuote x
@@ -25,7 +29,7 @@ let rec evalExp env = function
        | P (x, y) ->
           let rec splice rest = function
               EmptyListV -> evalQuasi rest
-            | PairV (a, b) -> (PairV (a, ref (splice rest !b)))
+            | PairV (a, b) -> PairV (a, ref (splice rest !b))
             | x -> failwith "splice not list"
              in
           (match x with
@@ -38,7 +42,7 @@ let rec evalExp env = function
           )
 
      in evalQuasi x
-
+ *)
   | IfExp (c, a, b) ->
       evalExp env (match evalExp env c with
           BoolV false -> b | _ -> a)
@@ -65,8 +69,8 @@ let rec evalExp env = function
   | LambdaExp (ids, varid, exp) ->
       ProcV (ids, varid, exp, env)
 
-  | MacroExp (ids, vararg, exp) ->
-      ProcV (ids, vararg, exp, env) (* MacroVでなくてもいいか?? *)
+  | MacroExp (ids, varid, exp) ->
+      ProcV (ids, varid, exp, env) (* MacroVでなくてもいいか?? *)
 
   | ApplyExp (exp, args) ->
      let proc = evalExp env exp

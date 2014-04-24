@@ -179,11 +179,11 @@ let cons a b =
 
 let car = function
     PairV (x, _) -> !x
-  | x -> failwith ("Arity mismatch: car not pair" ^ (printval x))
+  | x -> failwith ("Arity mismatch: car not pair: " ^ (printval x))
 
 let cdr = function 
     PairV (_, x) -> !x
-  | x -> failwith ("Arity mismatch: cdr not pair " ^ (printval x))
+  | x -> failwith ("Arity mismatch: cdr not pair: " ^ (printval x))
 
 let setcar v = function
     PairV (a, _) -> a := v; UnitV
@@ -224,7 +224,9 @@ let rec append_impl a b =
 let rec append_impl l1 l2 =
   match l1 with
     EmptyListV -> l2
-  | x -> cons (car x) (append_impl (cdr x) l2)
+  | PairV (car, cdr) -> cons !car (append_impl !cdr l2)
+  | x -> failwith ("Arity mismatch: append not pair: " ^ (printval x))
+(*  | x -> cons (car x) (append_impl (cdr x) l2) *)
 let rec append = function
     [] -> EmptyListV
   | [x] -> x
@@ -357,17 +359,6 @@ and map2 proc =
         cons (apply proc [car x; car y]) (impl (cdr x) (cdr y))
     )
   in impl
-(*
-and map3 proc l1 l2 l3 =
-  let rec impl x1 x2 x3 =
-    (match x1, x2, x3 with
-    | EmptyListV, _,_ | _, EmptyListV,_ | _,_,EmptyListV -> EmptyListV
-    | PairV(x1, rest1), PairV (x2, rest2), PairV(x3, rest3) ->
-        PairV (ref (apply proc [!x1; !x2; !x3]), ref (impl !rest1 !rest2 !rest3))
-    | _ -> failwith "not pair: map"
-    )
-  in impl l1 l2 l3
- *)
 
 and map proc =
   let rec impl xs =
@@ -666,5 +657,9 @@ in
        [x] -> apply x [EmptyListV]
      | _ -> failwith "Arity mismatch: force");
   ("error", function
-     | x -> failwith ("error:" ^ List.fold_right (fun x y -> printval x ^ y) x "")  );
+     | x :: objs ->
+        let m = List.fold_right (fun x y -> printval x ^ y) objs "" in
+        failwith ("error: " ^ printval x ^ "" ^ m)
+     | _ -> failwith "error" ) ;
+           
   ]
